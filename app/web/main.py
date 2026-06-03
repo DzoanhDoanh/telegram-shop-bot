@@ -911,7 +911,7 @@ async def add_inventory_web(
         items.append(item)
 
     if not items:
-        return RedirectResponse("/admin/inventory?msg=Không có digital goods hợp lệ nào", status_code=302)
+        return RedirectResponse("/admin/inventory?msg=Không có dữ liệu sản phẩm hợp lệ nào", status_code=302)
 
     existing = set()
     new_items = []
@@ -959,7 +959,7 @@ async def add_inventory_web(
 
     write_audit_event(request, "inventory_import", product_id=product_id, count=len(new_items), announcement_sent=announcement_sent, import_batch_id=import_batch_id)
     duplicate_count = request_duplicate_count + len(existing)
-    msg = f"✅ Đã thêm {len(new_items)} digital goods vào kho '{product_name}'. Trùng: {duplicate_count}. Dòng trống: {blank_count}."
+    msg = f"✅ Đã thêm {len(new_items)} mục dữ liệu sản phẩm vào kho '{product_name}'. Trùng: {duplicate_count}. Dòng trống: {blank_count}."
     if announcement_sent:
         msg = f"{msg} Đã gửi thông báo tới {announcement_sent} người dùng."
     return RedirectResponse(

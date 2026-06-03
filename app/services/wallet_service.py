@@ -479,11 +479,12 @@ async def pay_product_with_wallet(
     )
     delivery_text = (
         f"🎉 <b>Mua hàng thành công!</b>\n\n"
+        f"Mã đơn hàng: <b>#{order.id}</b>\n"
         f"Sản phẩm: <b>{escape(product.name)}</b>\n"
         f"Số lượng: <b>{requested_quantity}</b>\n"
         f"Số tiền: <b>{format_vnd(total_price)}</b>\n"
         f"Số dư còn lại: <b>{format_vnd(user.wallet_balance)}</b>\n\n"
-        f"Dữ liệu digital goods:\n{delivered_lines}\n\n"
+        f"Thông tin sản phẩm bạn nhận được:\n{delivered_lines}\n\n"
         "Cảm ơn bạn đã mua sắm tại shop!"
     )
     try:

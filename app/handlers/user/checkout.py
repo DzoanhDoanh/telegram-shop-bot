@@ -256,12 +256,14 @@ async def purchase_product(callback: types.CallbackQuery, state: FSMContext):
         )
         return
 
+    order_id = result.order.id if result.order else None
     text = (
         "✅ <b>Mua hàng thành công!</b>\n\n"
+        f"Mã đơn hàng: <b>#{order_id}</b>\n"
         f"Sản phẩm: <b>{product_name}</b>\n"
         f"Số lượng: <b>{quantity}</b>\n"
         f"Số tiền: <b>{wallet_service.format_vnd(total_price)}</b>\n"
-        "Dữ liệu sản phẩm đã được bot gửi ở tin nhắn giao hàng riêng để tránh trùng lặp và đỡ rối hơn.\n\n"
+        "Thông tin sản phẩm đã được bot gửi ở tin nhắn giao hàng.\n\n"
         "Cảm ơn bạn đã mua sắm tại shop!"
     )
     await callback.message.edit_text(text, reply_markup=_success_keyboard())

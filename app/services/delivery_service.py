@@ -52,8 +52,9 @@ def _build_delivery_text(order: Order, items: list[InventoryItem]) -> str:
     lines = [
         f"🎉 <b>Đơn hàng #{order.id} đã được duyệt!</b>",
         "",
+        f"Mã đơn hàng: <b>#{order.id}</b>",
         f"Sản phẩm: <b>{product_name}</b>",
-        "Dữ liệu digital goods của bạn:",
+        "Thông tin sản phẩm bạn nhận được:",
         "",
     ]
     for index, item in enumerate(items, 1):
@@ -99,7 +100,7 @@ async def approve_and_deliver_order(session: AsyncSession, bot: Bot, order_id: i
     order.completed_at = now
     await session.commit()
     await session.refresh(order)
-    return DeliveryResult(True, f"Đã duyệt và giao {len(items)} digital goods.", order)
+    return DeliveryResult(True, f"Đã duyệt và giao {len(items)} mục sản phẩm.", order)
 
 
 async def deliver_order(session: AsyncSession, bot: Bot, order: Order) -> bool:
