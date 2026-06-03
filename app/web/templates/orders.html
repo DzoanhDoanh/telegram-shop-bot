@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Đơn Hàng — Admin{% endblock %}
+{% block page_title %}Quản lý đơn hàng{% endblock %}
+
+{% block content %}
+<!-- Order Flow Guide -->
+<div class="mb-6 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-5">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+            <h2 class="text-base font-bold text-amber-300">Quy trình duyệt đơn an toàn</h2>
+            <p class="mt-2 text-sm text-amber-100/80">Luôn kiểm tra bill và số tiền trước khi duyệt đơn.</p>
+        </div>
+        <div class="grid gap-3 text-sm text-slate-200 sm:grid-cols-3 lg:min-w-[620px]">
+            <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <div class="text-xs font-bold uppercase tracking-wider text-slate-500">Bước 1</div>
+                <div class="mt-1 font-semibold">Xem bill</div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <div class="text-xs font-bold uppercase tracking-wider text-slate-500">Bước 2</div>
+                <div class="mt-1 font-semibold">Duyệt nếu tiền đúng</div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <div class="text-xs font-bold uppercase tracking-wider text-slate-500">Bước 3</div>
+                <div class="mt-1 font-semibold">Hệ thống gửi digital goods tự động</div>
+            </div>
+        </div>
+    </div>
+    <div class="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-200">
+        Cảnh báo: duyệt đơn sẽ giao stock cho khách hàng.
+    </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="mb-6 border-b border-slate-800 pb-4 overflow-x-auto">
+    <div class="flex w-max min-w-full flex-wrap items-center gap-2 sm:w-auto">
+        {% set statuses = [('all', 'Tất cả'), ('pending_payment', 'Chờ duyệt'), ('completed', 'Hoàn thành'), ('cancelled', 'Đã hủy')] %}
+        {% for val, label in statuses %}
+        <a href="/admin/orders?status={{ val }}"
+           class="shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 border
+                  {% if current_status == val %}bg-emerald-500/10 text-emerald-400 border-emerald-500/20{% else %}text-slate-400 border-transparent hover:bg-slate-800/50 hover:text-slate-100{% endif %}">
+            {{ label }}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Advanced Filters -->
+<form method="GET" action="/admin/orders" class="mb-6 bg-slate-900 border border-slate-800 rounded-2xl p-5">
+    {% if current_status != 'all' %}
+    <input type="hidden" name="status" value="{{ current_status }}">
+    {% endif %}
+    <div class="mb-4">
+        <h2 class="text-base font-bold text-slate-100">Bộ lọc đơn hàng</h2>
+        <p class="mt-1 text-sm text-slate-500">Lọc theo sản phẩm hoặc khoảng thời gian, không thay đổi trạng thái đang xem.</p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <label class="block min-w-0">
+            <span class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Sản phẩm cần xem</span>
+            <select name="product_id"
+                    class="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-sm text-slate-200 focus:border-emerald-500/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/10">
+                <option value="">Tất cả sản phẩm</option>
+                {% for product in products %}
+                <option value="{{ product.id }}" {% if product_id == product.id %}selected{% endif %}>{{ product.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="block min-w-0">
+            <span class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Từ ngày tạo đơn</span>
+            <input type="date" name="date_from" value="{{ date_from }}"
+                   class="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-sm text-slate-200 focus:border-emerald-500/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/10">
+        </label>
+        <label class="block min-w-0">
+            <span class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Đến ngày tạo đơn</span>
+            <input type="date" name="date_to" value="{{ date_to }}"
+                   class="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-sm text-slate-200 focus:border-emerald-500/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/10">
+        </label>
+        <div class="flex items-end">
+            <button type="submit"
+                    class="w-full px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-bold hover:bg-emerald-500/20 transition-colors duration-150">
+                Lọc đơn hàng
+            </button>
+        </div>
+    </div>
+</form>
+
+<!-- Orders Table -->
+<div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+    {% if orders %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-slate-800">
+                    <th class="text-left text-xs text-slate-500 font-semibold uppercase tracking-wider px-6 py-4">Đơn #</th>
+                    <th class="text-left text-xs text-slate-500 font-semibold uppercase tracking-wider px-4 py-4">Sản Phẩm</th>
+                    <th class="text-left text-xs text-slate-500 font-semibold uppercase tracking-wider px-4 py-4">Khách Hàng</th>
+                    <th class="text-right text-xs text-slate-500 font-semibold uppercase tracking-wider px-4 py-4">Số Tiền</th>
+                    <th class="text-center text-xs text-slate-500 font-semibold uppercase tracking-wider px-4 py-4">Trạng Thái</th>
+                    <th class="text-center text-xs text-slate-500 font-semibold uppercase tracking-wider px-4 py-4">Hóa Đơn</th>
+                    <th class="text-center text-xs text-slate-500 font-semibold uppercase tracking-wider px-4 py-4">Thao Tác</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50">
+                {% for order in orders %}
+                <tr class="hover:bg-slate-800/30 transition-colors duration-150">
+                    <td class="px-6 py-4 font-bold text-slate-100">#{{ order.id }}</td>
+                    <td class="px-4 py-4">
+                        <div class="font-medium text-slate-100">{{ order.product.name }}</div>
+                        <div class="text-xs text-slate-500">{{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                    </td>
+                    <td class="px-4 py-4">
+                        <div class="font-medium text-slate-300">{{ order.user.full_name or 'N/A' }}</div>
+                        <div class="text-xs text-slate-500">ID: {{ order.user_id }}</div>
+                    </td>
+                    <td class="px-4 py-4 text-right font-bold text-emerald-400">{{ "{:,.0f}".format(order.total_amount) }}đ</td>
+                    <td class="px-4 py-4 text-center">
+                        <span class="text-xs font-bold px-3 py-1 rounded-full 
+                            {% if order.status.value == 'completed' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
+                            {% elif order.status.value == 'pending_payment' %}bg-amber-500/10 text-amber-400 border border-amber-500/20
+                            {% else %}bg-slate-700/50 text-slate-400 border border-slate-700{% endif %}">
+                            {% if order.status.value == 'completed' %}Hoàn thành
+                            {% elif order.status.value == 'pending_payment' %}Chờ duyệt
+                            {% else %}Đã hủy{% endif %}
+                        </span>
+                    </td>
+                    <td class="px-4 py-4 text-center">
+                        {% if order.payment_proof %}
+                        <button type="button"
+                                onclick="openBillModal('billModal-{{ order.id }}')"
+                                class="inline-flex items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-400 transition-colors duration-150 hover:bg-emerald-500/20 hover:text-emerald-300">
+                            Xem bill
+                        </button>
+                        <div id="billModal-{{ order.id }}" class="fixed flex inset-0 z-50 hidden items-center justify-center bg-slate-950/80 px-4 py-6" onclick="closeBillModal('billModal-{{ order.id }}')">
+                            <div class="admin-modal-panel w-full max-w-3xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl" onclick="event.stopPropagation()">
+                                <div class="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+                                    <h2 class="text-base font-bold text-slate-100">Bill thanh toán #{{ order.id }}</h2>
+                                    <button type="button"
+                                            onclick="closeBillModal('billModal-{{ order.id }}')"
+                                            class="rounded-xl border border-slate-700 px-3 py-1.5 text-sm font-bold text-slate-300 transition-colors duration-150 hover:bg-slate-800 hover:text-slate-100">
+                                        Đóng
+                                    </button>
+                                </div>
+                                <div class="max-h-[75vh] overflow-auto p-4">
+                                    <img src="/admin/orders/{{ order.id }}/bill" alt="Bill thanh toán #{{ order.id }}" class="mx-auto max-h-[70vh] max-w-full rounded-xl border border-slate-800 object-contain">
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <span class="text-xs text-slate-600">Không có</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-4 text-center">
+                        {% if order.status.value == 'pending_payment' %}
+                        <div class="flex flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-center">
+                            <form method="POST" action="/admin/orders/{{ order.id }}/approve" class="inline-flex justify-center"
+                                  onsubmit="return confirmAction('Duyệt đơn #{{ order.id }} và gửi digital goods cho khách?', this, 'Đang duyệt...');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit"
+                                    class="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-xl hover:bg-emerald-500/20 transition-colors duration-150">
+                                    Duyệt & giao hàng
+                                </button>
+                            </form>
+                            <form method="POST" action="/admin/orders/{{ order.id }}/reject" class="inline-flex flex-col items-stretch gap-2 sm:flex-row sm:items-center"
+                                  onsubmit="return confirmAction('Từ chối đơn #{{ order.id }}? Khách sẽ không nhận hàng.', this, 'Đang từ chối...');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="text" name="reason" placeholder="Lý do từ chối" required
+                                       class="w-full min-w-28 rounded-xl bg-slate-950 border border-slate-800 px-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 sm:w-32">
+                                <button type="submit"
+                                    class="px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold rounded-xl hover:bg-red-500/20 transition-colors duration-150">
+                                    Từ chối
+                                </button>
+                            </form>
+                        </div>
+                        {% else %}
+                        <span class="text-xs text-slate-600">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="flex flex-col items-center justify-center px-6 py-20 text-center text-slate-500">
+        <span class="text-5xl mb-4">📭</span>
+        <p class="font-medium text-slate-300">Không có đơn hàng nào.</p>
+        <p class="mt-2 max-w-md text-sm text-slate-500">Thử bỏ bộ lọc hiện tại để xem toàn bộ đơn hàng.</p>
+        <a href="/admin/orders"
+           class="mt-5 inline-flex items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-bold text-emerald-400 transition-colors duration-150 hover:bg-emerald-500/20">
+            Xóa bộ lọc
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function openBillModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeBillModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+</script>
+{% endblock %}

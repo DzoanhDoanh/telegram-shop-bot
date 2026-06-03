@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Nhập kho — Admin{% endblock %}
+{% block page_title %}Nhập kho digital goods{% endblock %}
+
+{% block content %}
+<div class="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg shadow-slate-950/20">
+    <div class="space-y-3">
+        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-400">Quy trình nhập kho</p>
+        <h2 class="text-xl font-bold text-slate-100">Chuẩn bị dữ liệu giao tự động</h2>
+        <div class="grid grid-cols-1 gap-3 text-sm leading-6 text-slate-400 lg:grid-cols-3">
+            <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-4">Mỗi dòng là một deliverable item riêng: key, tài khoản, link tải hoặc hướng dẫn truy cập.</div>
+            <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-4">Bot tự động gửi item cho khách sau khi đơn hàng được duyệt.</div>
+            <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-200">Kiểm tra kỹ trước khi nạp. Tránh dán trùng, sai sản phẩm hoặc dữ liệu nhạy cảm không dành cho khách.</div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+    <div class="rounded-2xl border border-slate-800 bg-slate-900 p-7">
+        <h3 class="mb-1 text-base font-bold text-slate-100">Nạp danh sách digital goods</h3>
+        <p class="mb-5 text-sm text-slate-400">Chọn đúng sản phẩm, dán dữ liệu, kiểm tra số dòng hợp lệ rồi mới nạp. Mỗi dòng sẽ được giao cho đúng 1 đơn hàng.</p>
+
+        <div class="mb-5 grid grid-cols-1 gap-3 text-xs leading-5 text-slate-300 sm:grid-cols-3">
+            <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <div class="font-bold text-slate-100">Bước 1</div>
+                <div>Chọn đúng sản phẩm cần nạp kho.</div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <div class="font-bold text-slate-100">Bước 2</div>
+                <div>Dán mỗi key/tài khoản/link trên một dòng riêng.</div>
+            </div>
+            <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-200">
+                <div class="font-bold">Bước 3</div>
+                <div>Đọc phần kiểm tra nhanh trước khi bấm nạp.</div>
+            </div>
+        </div>
+
+        <form method="POST" action="/admin/inventory/add" class="space-y-4" onsubmit="return confirmAction('Nạp danh sách digital goods này vào kho? Hãy kiểm tra trùng lặp trước khi tiếp tục.', this, 'Đang nạp...');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-300">Sản phẩm nhận hàng</label>
+                <select name="product_id" required
+                        class="w-full cursor-pointer appearance-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 transition-colors focus:border-emerald-500 focus:outline-none">
+                    <option value="" disabled {% if not selected_product_id %}selected{% endif %}>-- Chọn sản phẩm --</option>
+                    {% for p in products %}
+                    <option value="{{ p.id }}" {% if selected_product_id == p.id %}selected{% endif %}>
+                        {{ p.name }} (Tồn: {{ p.stock }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-300">
+                    Digital goods cần nhập
+                    <span class="ml-1 text-xs text-slate-500">(mỗi dòng = 1 item giao cho 1 đơn)</span>
+                </label>
+                <textarea id="inventoryKeys" name="keys" rows="12" required
+                          placeholder="Dán dữ liệu kho tại đây..."
+                          class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 font-mono text-sm leading-relaxed text-slate-100 placeholder-slate-700 transition-colors focus:border-emerald-500 focus:outline-none"></textarea>
+
+                <div class="mt-3 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+                    <div class="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-400">Ví dụ định dạng dễ hiểu cho khách</div>
+                    <pre class="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-slate-900 px-3 py-3 font-mono text-xs leading-6 text-slate-300">KEY-ABCD-1234-EFGH
+account@example.com | MatKhauManh123 | ghi chú đăng nhập
+https://example.com/download/license-001
+Google Drive: https://drive.google.com/... | Mã truy cập: 123456</pre>
+                </div>
+
+                <div class="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                    <div class="rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-slate-300">
+                        Dòng hợp lệ: <span id="validLineCount" class="font-bold text-emerald-300">0</span>
+                    </div>
+                    <div class="rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-slate-300">
+                        Dòng trống: <span id="blankLineCount" class="font-bold text-slate-100">0</span>
+                    </div>
+                    <div class="rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-slate-300">
+                        Trùng trong ô nhập: <span id="duplicateLineCount" class="font-bold text-amber-300">0</span>
+                    </div>
+                </div>
+                <p class="mt-2 text-xs leading-5 text-slate-500">
+                    Ví dụ nên rõ ràng, đủ thông tin để khách dùng ngay: key bản quyền, tài khoản kèm mật khẩu, link tải kèm mã truy cập hoặc hướng dẫn mở file. Dòng trùng trong cùng lần nhập sẽ bị bỏ qua.
+                </p>
+            </div>
+            <div class="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm leading-6 text-red-100">
+                <b>Lưu ý:</b> sau khi nạp, dữ liệu có thể được giao tự động cho khách khi mua hàng. Hãy kiểm tra đúng sản phẩm, đúng định dạng và không dán nhầm dữ liệu nội bộ.
+            </div>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button type="submit" name="dry_run" value="1"
+                        class="w-full rounded-xl border border-slate-700 bg-slate-800 py-3 font-bold text-slate-100 transition-all duration-200 hover:bg-slate-700 active:scale-[0.98]">
+                    Preview trước khi nhập
+                </button>
+                <button type="submit" name="dry_run" value="0"
+                        class="w-full rounded-xl bg-emerald-500 py-3 font-bold text-slate-900 transition-all duration-200 hover:bg-emerald-600 active:scale-[0.98]">
+                    Kiểm tra xong, nạp vào kho
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="space-y-6 xl:sticky xl:top-24 xl:self-start">
+        <div class="rounded-2xl border border-emerald-500/20 bg-slate-900 p-7 shadow-lg shadow-slate-950/20">
+            <h3 class="mb-4 text-base font-bold text-slate-100">Gợi ý khi đang nhập kho</h3>
+            <div class="space-y-3 text-sm leading-6 text-slate-300">
+                <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div class="font-semibold text-slate-100">1. Mỗi dòng = 1 món giao</div>
+                    <div class="mt-1 text-slate-400">Một key, một tài khoản hoặc một link tải nên nằm trên đúng một dòng riêng.</div>
+                </div>
+                <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div class="font-semibold text-slate-100">2. Ghi đủ để khách dùng ngay</div>
+                    <div class="mt-1 text-slate-400">Nếu là tài khoản, nên có email | mật khẩu | ghi chú. Nếu là link, nên có cả mã truy cập nếu cần.</div>
+                </div>
+                <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-200">
+                    <div class="font-semibold">3. Không dán dữ liệu nội bộ</div>
+                    <div class="mt-1">Bất kỳ dòng nào nạp vào đây đều có thể được giao thẳng cho khách sau khi mua.</div>
+                </div>
+                <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-xs leading-5 text-slate-400">
+                    Bạn có thể để phần này mở trong lúc nhập dở để đối chiếu nhanh, tránh dán nhầm sản phẩm hoặc nhầm định dạng.
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-2xl border border-slate-800 bg-slate-900 p-7">
+        <h3 class="mb-5 text-base font-bold text-slate-100">Tổng quan tồn kho</h3>
+        <div class="space-y-3">
+            {% for p in products %}
+            <div class="flex items-center justify-between border-b border-slate-800 py-3 last:border-0">
+                <div class="mr-4 flex min-w-0 flex-1 flex-col">
+                    <span class="truncate font-semibold text-slate-100">{{ p.name }}</span>
+                    <span class="mt-0.5 text-xs text-slate-500">{{ "{:,.0f}".format(p.price) }}đ / item</span>
+                </div>
+                <div class="flex shrink-0 items-center gap-3">
+                    <div class="h-1.5 w-24 rounded-full bg-slate-800">
+                        <div class="h-1.5 rounded-full transition-all duration-500
+                            {% if p.stock == 0 %}w-0 bg-red-500{% elif p.stock < 5 %}bg-amber-500{% else %}bg-emerald-500{% endif %}"
+                             style="width: {{ [100, (p.stock / 20 * 100) | int] | min }}%"></div>
+                    </div>
+                    <span class="w-10 text-right text-sm font-bold {% if p.stock == 0 %}text-red-400{% elif p.stock < 5 %}text-amber-400{% else %}text-slate-100{% endif %}">
+                        {{ p.stock }}
+                    </span>
+                </div>
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center justify-center px-6 py-14 text-center text-slate-500">
+                <p class="mb-2 font-semibold text-slate-200">Chưa có sản phẩm để nạp kho.</p>
+                <p class="mb-5 text-sm">Tạo sản phẩm trước, sau đó quay lại nạp key/tài khoản.</p>
+                <a href="/admin/products"
+                   class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-900 transition-colors hover:bg-emerald-600">
+                    Tạo sản phẩm
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const textarea = document.getElementById('inventoryKeys');
+    if (!textarea) return;
+
+    const validLineCount = document.getElementById('validLineCount');
+    const blankLineCount = document.getElementById('blankLineCount');
+    const duplicateLineCount = document.getElementById('duplicateLineCount');
+
+    function updateInventoryStats() {
+        const lines = textarea.value.split(/\r?\n/);
+        const seen = new Set();
+        let valid = 0;
+        let blank = 0;
+        let duplicate = 0;
+
+        for (const line of lines) {
+            const item = line.trim();
+            if (!item) {
+                blank += 1;
+                continue;
+            }
+            if (seen.has(item)) {
+                duplicate += 1;
+                continue;
+            }
+            seen.add(item);
+            valid += 1;
+        }
+
+        validLineCount.textContent = valid;
+        blankLineCount.textContent = blank;
+        duplicateLineCount.textContent = duplicate;
+    }
+
+    textarea.addEventListener('input', updateInventoryStats);
+    updateInventoryStats();
+})();
+</script>
+{% endblock %}

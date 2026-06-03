@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Trung tâm vận hành shop — Admin{% endblock %}
+{% block page_title %}Trung tâm vận hành shop{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Intro -->
+<div class="mb-6 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+    <div class="grid grid-cols-1 gap-5 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-400">Bảng điều phối</p>
+            <h2 class="mt-2 text-2xl font-extrabold text-slate-100">Trung tâm vận hành shop</h2>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+                Theo dõi doanh thu, đơn hàng cần duyệt và rủi ro tồn kho trong một màn hình để xử lý vận hành hằng ngày nhanh hơn.
+            </p>
+        </div>
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:min-w-[420px]">
+            <a href="/admin/orders?status=pending_payment" class="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-200 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15">
+                Duyệt đơn
+                <span class="mt-1 block text-xs font-normal text-amber-200/70">Xử lý thanh toán chờ</span>
+            </a>
+            <a href="/admin/products" class="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-200 transition-colors hover:border-emerald-400/50 hover:bg-emerald-500/15">
+                Thêm sản phẩm
+                <span class="mt-1 block text-xs font-normal text-emerald-200/70">Mở rộng danh mục</span>
+            </a>
+            <a href="/admin/inventory" class="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-200 transition-colors hover:border-emerald-400/50 hover:bg-emerald-500/15">
+                Nạp kho
+                <span class="mt-1 block text-xs font-normal text-emerald-200/70">Bổ sung tồn kho</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 gap-5 mb-6 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition-colors duration-200 hover:border-emerald-500/30">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <span class="text-sm font-semibold text-slate-300">Doanh thu đã ghi nhận</span>
+                <p class="mt-1 text-xs text-slate-500">Tổng doanh thu từ đơn đã hoàn thành.</p>
+            </div>
+            <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-xs font-bold text-emerald-300">Revenue</span>
+        </div>
+        <div class="mt-4 text-3xl font-extrabold tracking-tight text-emerald-400">{{ "{:,.0f}".format(stats.revenue) }}đ</div>
+    </div>
+
+    <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition-colors duration-200 hover:border-emerald-500/30">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <span class="text-sm font-semibold text-slate-300">Đơn đã hoàn thành</span>
+                <p class="mt-1 text-xs text-slate-500">Đơn đã chốt thành công trong hệ thống.</p>
+            </div>
+            <span class="rounded-full border border-slate-700 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-300">Orders</span>
+        </div>
+        <div class="mt-4 text-3xl font-extrabold tracking-tight text-slate-100">{{ stats.completed_orders }}</div>
+        <p class="mt-1 text-xs text-slate-500">Tổng cộng {{ stats.total_orders }} đơn hàng.</p>
+    </div>
+
+    <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition-colors duration-200 hover:border-emerald-500/30">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <span class="text-sm font-semibold text-slate-300">Khách hàng đăng ký</span>
+                <p class="mt-1 text-xs text-slate-500">Người dùng có thể tạo đơn qua shop.</p>
+            </div>
+            <span class="rounded-full border border-slate-700 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-300">Customers</span>
+        </div>
+        <div class="mt-4 text-3xl font-extrabold tracking-tight text-slate-100">{{ stats.total_users }}</div>
+    </div>
+
+    <div class="rounded-2xl border p-5 transition-colors duration-200 {% if stats.pending_orders > 0 %}border-amber-500/50 bg-amber-500/10 shadow-lg shadow-amber-950/20{% else %}border-slate-800 bg-slate-900 hover:border-emerald-500/30{% endif %}">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <span class="text-sm font-semibold {% if stats.pending_orders > 0 %}text-amber-100{% else %}text-slate-300{% endif %}">Đơn chờ xử lý</span>
+                <p class="mt-1 text-xs {% if stats.pending_orders > 0 %}text-amber-200/70{% else %}text-slate-500{% endif %}">
+                    {% if stats.pending_orders > 0 %}Cần kiểm tra thanh toán và cập nhật trạng thái.{% else %}Không có đơn đang chờ thanh toán.{% endif %}
+                </p>
+            </div>
+            <span class="rounded-full border px-2 py-1 text-xs font-bold {% if stats.pending_orders > 0 %}border-amber-400/30 bg-amber-400/10 text-amber-200{% else %}border-slate-700 bg-slate-800 text-slate-300{% endif %}">Pending</span>
+        </div>
+        <div class="mt-4 text-3xl font-extrabold tracking-tight {% if stats.pending_orders > 0 %}text-amber-300{% else %}text-slate-100{% endif %}">{{ stats.pending_orders }}</div>
+        {% if stats.pending_orders > 0 %}
+        <a href="/admin/orders?status=pending_payment" class="mt-2 inline-flex text-xs font-semibold text-amber-200 hover:underline">Mở danh sách cần duyệt →</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <a href="/admin/payments?status=pending" class="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 transition-colors hover:border-amber-400/50">
+        <div class="text-xs uppercase tracking-[0.18em] text-amber-300">Pending deposits</div>
+        <div class="mt-2 text-2xl font-bold text-slate-100">{{ stats.pending_deposits }}</div>
+    </a>
+    <a href="/admin/payments?status=underpaid" class="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 transition-colors hover:border-red-400/50">
+        <div class="text-xs uppercase tracking-[0.18em] text-red-300">Underpaid</div>
+        <div class="mt-2 text-2xl font-bold text-slate-100">{{ stats.underpaid_deposits }}</div>
+    </a>
+    <a href="/admin/payments?status=review_required" class="rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/5 p-4 transition-colors hover:border-fuchsia-400/50">
+        <div class="text-xs uppercase tracking-[0.18em] text-fuchsia-300">Review required</div>
+        <div class="mt-2 text-2xl font-bold text-slate-100">{{ stats.review_required }}</div>
+    </a>
+    <a href="/admin/payments?status=late_paid" class="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 transition-colors hover:border-cyan-400/50">
+        <div class="text-xs uppercase tracking-[0.18em] text-cyan-300">Late paid</div>
+        <div class="mt-2 text-2xl font-bold text-slate-100">{{ stats.late_paid_deposits }}</div>
+    </a>
+</div>
+
+<!-- Work Queue -->
+<div class="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+    <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <h3 class="text-base font-bold text-slate-100">Việc cần xử lý</h3>
+            <p class="text-xs text-slate-500 mt-1">Ưu tiên các tác vụ ảnh hưởng trực tiếp đến đơn hàng và tồn kho.</p>
+        </div>
+        <span class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Operations queue</span>
+    </div>
+    {% if stats.pending_orders > 0 or low_stock_products %}
+    <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {% if stats.pending_orders > 0 %}
+        <a href="/admin/orders?status=pending_payment" class="flex items-center justify-between gap-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-4 transition-colors hover:border-amber-400/50">
+            <span>
+                <span class="block text-sm font-bold text-amber-100">{{ stats.pending_orders }} đơn chờ duyệt</span>
+                <span class="mt-1 block text-xs text-amber-200/70">Kiểm tra bằng chứng thanh toán và cập nhật trạng thái.</span>
+            </span>
+            <span class="shrink-0 text-xs font-semibold text-amber-200">Xử lý →</span>
+        </a>
+        {% endif %}
+        {% if low_stock_products %}
+        <a href="/admin/inventory" class="flex items-center justify-between gap-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-4 transition-colors hover:border-amber-400/50">
+            <span>
+                <span class="block text-sm font-bold text-amber-100">{{ low_stock_products|length }} sản phẩm tồn kho thấp</span>
+                <span class="mt-1 block text-xs text-amber-200/70">Nạp kho trước khi hết hàng hoặc tạm ẩn sản phẩm rủi ro.</span>
+            </span>
+            <span class="shrink-0 text-xs font-semibold text-amber-200">Nạp kho →</span>
+        </a>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-200">
+        Không có đơn chờ xử lý hoặc cảnh báo tồn kho. Shop đang vận hành ổn định.
+    </div>
+    {% endif %}
+</div>
+
+<!-- Chart + Recent Orders -->
+<div class="grid grid-cols-1 xl:grid-cols-5 gap-5">
+    <!-- Revenue Chart -->
+    <div class="xl:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <h3 class="text-base font-bold text-slate-100">Doanh thu 7 ngày gần nhất</h3>
+                <p class="mt-1 text-xs text-slate-500">Theo dõi xu hướng doanh thu từ các đơn đã hoàn thành.</p>
+            </div>
+            <span class="text-xs font-semibold text-slate-500">7 ngày</span>
+        </div>
+        <div class="relative h-64">
+            <canvas id="revenueChart"></canvas>
+            <div id="revenueChartEmpty" class="hidden absolute inset-0 flex flex-col items-center justify-center text-center px-6 bg-slate-900/80 rounded-xl">
+                <span class="text-sm font-semibold text-slate-300">Chưa có doanh thu trong 7 ngày gần nhất</span>
+                <span class="text-xs text-slate-500 mt-1">Biểu đồ sẽ hiển thị khi có đơn hoàn thành.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Orders Table -->
+    <div class="xl:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex justify-between items-start gap-4 mb-5">
+            <div>
+                <h3 class="text-base font-bold text-slate-100">Đơn hàng gần đây</h3>
+                <p class="mt-1 text-xs text-slate-500">Tín hiệu mới nhất từ luồng bán hàng.</p>
+            </div>
+            <a href="/admin/orders" class="shrink-0 text-xs text-emerald-400 hover:underline">Xem tất cả →</a>
+        </div>
+        <div class="space-y-3">
+            {% for order in recent_orders %}
+            <div class="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+                <div class="flex flex-col min-w-0">
+                    <span class="text-sm font-semibold text-slate-100 truncate">#{{ order.id }} — {{ order.product.name }}</span>
+                    <span class="text-xs text-slate-500">{{ order.created_at.strftime('%d/%m %H:%M') }}</span>
+                </div>
+                <span class="text-xs font-bold px-2 py-1 rounded-full shrink-0 ml-2 
+                    {% if order.status.value == 'completed' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
+                    {% elif order.status.value == 'pending_payment' %}bg-amber-500/10 text-amber-400 border border-amber-500/20
+                    {% else %}bg-slate-700 text-slate-400{% endif %}">
+                    {% if order.status.value == 'completed' %}Xong
+                    {% elif order.status.value == 'pending_payment' %}Chờ duyệt
+                    {% else %}Hủy{% endif %}
+                </span>
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-slate-500 text-sm">Chưa có đơn hàng nào.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Low Stock -->
+<div class="mt-5 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+    <div class="flex flex-col gap-3 mb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h3 class="text-base font-bold text-slate-100">Rủi ro tồn kho</h3>
+            <p class="text-xs text-slate-500 mt-1">Sản phẩm đang hoạt động có tồn kho dưới 5. Ưu tiên nạp kho hoặc điều chỉnh trạng thái bán.</p>
+        </div>
+        <a href="/admin/inventory" class="text-xs font-semibold text-emerald-400 hover:underline">Mở quản lý kho →</a>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {% for product in low_stock_products %}
+        <a href="/admin/inventory?product_id={{ product.id }}" class="flex items-center justify-between gap-4 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 hover:border-amber-400/40 transition-colors">
+            <span class="min-w-0">
+                <span class="block text-sm font-semibold text-slate-100 truncate">{{ product.name }}</span>
+                <span class="block text-xs text-slate-500 mt-1">Tồn kho thấp, nhấn để cập nhật số lượng</span>
+            </span>
+            <span class="shrink-0 text-right">
+                <span class="block rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-sm font-bold text-amber-300">{{ product.stock }}</span>
+                <span class="mt-1 block text-[11px] text-amber-200/70">còn lại</span>
+            </span>
+        </a>
+        {% else %}
+        <div class="md:col-span-2 xl:col-span-3 text-center py-8 text-slate-500 text-sm border border-slate-800 rounded-xl bg-slate-950/30">
+            Tồn kho đang an toàn. Không có sản phẩm dưới ngưỡng cảnh báo.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const labels = {{ chart_labels | tojson }};
+const data = {{ chart_data | tojson }};
+
+const hasChartData = data.some((value) => Number(value) > 0);
+const emptyState = document.getElementById('revenueChartEmpty');
+if (!hasChartData && emptyState) {
+    emptyState.classList.remove('hidden');
+}
+
+const ctx = document.getElementById('revenueChart').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Doanh thu (đ)',
+            data: data,
+            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+            borderColor: 'rgba(16, 185, 129, 0.8)',
+            borderWidth: 2,
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: {
+                ticks: { color: '#94a3b8', font: { size: 11 } },
+                grid: { color: 'rgba(51, 65, 85, 0.5)' }
+            },
+            y: {
+                ticks: { color: '#94a3b8', font: { size: 11 }, callback: (v) => v.toLocaleString('vi-VN') + 'đ' },
+                grid: { color: 'rgba(51, 65, 85, 0.5)' }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

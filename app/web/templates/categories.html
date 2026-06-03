@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Danh mục — Admin{% endblock %}
+{% block page_title %}Quản lý danh mục{% endblock %}
+
+{% block content %}
+<div class="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg shadow-slate-950/20">
+    <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div class="space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-400">Catalog structure</p>
+            <h2 class="text-xl font-bold text-slate-100">Danh mục sản phẩm</h2>
+            <p class="max-w-3xl text-sm leading-6 text-slate-400">
+                Danh mục giúp khách duyệt shop trên bot nhanh hơn. Chỉ xóa danh mục khi không còn sản phẩm đang bán trong danh mục đó.
+            </p>
+            <p class="text-sm text-slate-500">Hiện có <span class="font-semibold text-slate-200">{{ categories | length }}</span> danh mục đang hoạt động.</p>
+        </div>
+        <button type="button" onclick="document.getElementById('addCategoryModal').classList.remove('hidden')"
+                class="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-900 transition-all duration-200 hover:bg-emerald-600 active:scale-95">
+            Thêm danh mục
+        </button>
+    </div>
+</div>
+
+<div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+    {% if categories %}
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[760px] text-sm">
+            <thead>
+                <tr class="border-b border-slate-800">
+                    <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">ID</th>
+                    <th class="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Danh mục</th>
+                    <th class="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Mô tả</th>
+                    <th class="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">Sản phẩm</th>
+                    <th class="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50">
+                {% for category in categories %}
+                <tr class="transition-colors duration-150 hover:bg-slate-800/30">
+                    <td class="px-6 py-4 font-mono text-slate-500">{{ category.id }}</td>
+                    <td class="px-4 py-4">
+                        <div class="flex items-center gap-3">
+                            <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base">{{ category.emoji or '📦' }}</span>
+                            <span class="font-semibold text-slate-100">{{ category.name }}</span>
+                        </div>
+                    </td>
+                    <td class="px-4 py-4 text-slate-400">
+                        {% if category.description %}
+                        <span class="line-clamp-2">{{ category.description }}</span>
+                        {% else %}
+                        <span class="text-slate-600">Chưa có mô tả</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-4 text-center">
+                        <span class="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs font-bold text-slate-300">{{ category.product_count }}</span>
+                    </td>
+                    <td class="px-4 py-4">
+                        <div class="flex flex-wrap items-center justify-center gap-2">
+                            <button type="button" onclick="document.getElementById('editCategoryModal{{ category.id }}').classList.remove('hidden')"
+                                    class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700">
+                                Sửa
+                            </button>
+                            <form method="POST" action="/admin/categories/{{ category.id }}/delete" onsubmit="if (!confirm('Xóa danh mục ' + {{ category.name|tojson }} + '? Chỉ xóa được khi danh mục không còn sản phẩm.')) return false; setLoading(this, 'Đang xóa...'); return true;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit"
+                                        class="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20">
+                                    Xóa danh mục
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="flex flex-col items-center justify-center px-6 py-20 text-center text-slate-500">
+        <p class="mb-2 font-semibold text-slate-200">Chưa có danh mục nào.</p>
+        <p class="mb-5 text-sm">Tạo danh mục đầu tiên để bắt đầu phân loại sản phẩm.</p>
+        <button type="button" onclick="document.getElementById('addCategoryModal').classList.remove('hidden')"
+                class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-900 transition-colors hover:bg-emerald-600">
+            Thêm danh mục đầu tiên
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+{% for category in categories %}
+<div id="editCategoryModal{{ category.id }}" class="fixed flex inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+    <div class="admin-modal-panel w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-7 shadow-2xl">
+        <div class="mb-6 flex items-center justify-between">
+            <h3 class="text-lg font-bold text-slate-100">Sửa danh mục #{{ category.id }}</h3>
+            <button type="button" onclick="document.getElementById('editCategoryModal{{ category.id }}').classList.add('hidden')"
+                    class="text-xl leading-none text-slate-400 transition-colors hover:text-slate-100">&times;</button>
+        </div>
+        <form method="POST" action="/admin/categories/{{ category.id }}/edit" class="space-y-4" onsubmit="return confirmAction('Lưu thay đổi danh mục #{{ category.id }}?', this, 'Đang lưu...');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-300">Tên danh mục</label>
+                <input name="name" value="{{ category.name }}" required
+                       class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-300">Emoji</label>
+                <input name="emoji" value="{{ category.emoji or '📦' }}" maxlength="10"
+                       class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-300">Mô tả <span class="text-xs text-slate-500">(tùy chọn)</span></label>
+                <textarea name="description" rows="3" placeholder="Mô tả ngắn về nhóm sản phẩm..."
+                          class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">{{ category.description or '' }}</textarea>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="document.getElementById('editCategoryModal{{ category.id }}').classList.add('hidden')"
+                        class="flex-1 rounded-xl border border-slate-700 py-2.5 text-sm font-medium text-slate-400 transition-all hover:border-slate-600 hover:text-slate-100">
+                    Hủy
+                </button>
+                <button type="submit"
+                        class="flex-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-slate-900 transition-all hover:bg-emerald-600 active:scale-95">
+                    Lưu thay đổi
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+<div id="addCategoryModal" class="fixed flex inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+    <div class="admin-modal-panel w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-7 shadow-2xl">
+        <div class="mb-6 flex items-center justify-between">
+            <h3 class="text-lg font-bold text-slate-100">Thêm danh mục mới</h3>
+            <button type="button" onclick="document.getElementById('addCategoryModal').classList.add('hidden')"
+                    class="text-xl leading-none text-slate-400 transition-colors hover:text-slate-100">&times;</button>
+        </div>
+        <form method="POST" action="/admin/categories/add" class="space-y-4" onsubmit="return confirmAction('Tạo danh mục mới?', this, 'Đang tạo...');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-300">Tên danh mục</label>
+                <input name="name" required placeholder="Vd: Tài khoản streaming"
+                       class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-300">Emoji</label>
+                <input name="emoji" value="📦" maxlength="10"
+                       class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-300">Mô tả <span class="text-xs text-slate-500">(tùy chọn)</span></label>
+                <textarea name="description" rows="3" placeholder="Mô tả ngắn về nhóm sản phẩm..."
+                          class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"></textarea>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="document.getElementById('addCategoryModal').classList.add('hidden')"
+                        class="flex-1 rounded-xl border border-slate-700 py-2.5 text-sm font-medium text-slate-400 transition-all hover:border-slate-600 hover:text-slate-100">
+                    Hủy
+                </button>
+                <button type="submit"
+                        class="flex-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-slate-900 transition-all hover:bg-emerald-600 active:scale-95">
+                    Tạo danh mục
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

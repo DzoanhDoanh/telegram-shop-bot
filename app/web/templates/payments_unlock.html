@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Mở khóa thanh toán{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-xl space-y-6">
+  <div class="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
+    <p class="text-xs font-bold uppercase tracking-[0.22em] text-amber-300">Khu vực nhạy cảm</p>
+    <h1 class="mt-2 text-xl font-bold text-slate-100">Mở khóa trang thanh toán</h1>
+    <p class="mt-2 text-sm leading-6 text-amber-100/90">
+      Trang này chứa tài khoản ngân hàng, webhook secret và lịch sử ví. Vui lòng nhập mã bảo vệ để tiếp tục.
+    </p>
+  </div>
+
+  {% if error %}
+  <div class="rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-3 text-sm text-red-200">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST" action="/admin/payments/unlock" class="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg shadow-slate-950/20">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="mb-1.5 block text-sm font-medium text-slate-300">Mã bảo vệ thanh toán</label>
+    <input type="password" name="pin" required autofocus placeholder="Nhập PAYMENT_ADMIN_PIN"
+           class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">
+    <p class="mt-2 text-xs leading-5 text-slate-500">
+      Nên đặt biến <code>PAYMENT_ADMIN_PIN</code> riêng trong <code>.env</code>. Nếu chưa đặt, hệ thống dùng tạm mật khẩu admin.
+    </p>
+    <button type="submit" class="mt-5 w-full rounded-xl bg-emerald-500 py-3 font-bold text-slate-900 transition-all hover:bg-emerald-600 active:scale-[0.98]">
+      Mở khóa 30 phút
+    </button>
+  </form>
+</div>
+{% endblock %}

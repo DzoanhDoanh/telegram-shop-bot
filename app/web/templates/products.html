@@ -1,0 +1,598 @@
+{% extends "base.html" %} {% block title %}Sản phẩm — Admin{% endblock %} {%
+block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
+<div
+  class="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg shadow-slate-950/20"
+>
+  <div
+    class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"
+  >
+    <div class="space-y-2">
+      <p
+        class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-400"
+      >
+        Digital goods
+      </p>
+      <h2 class="text-xl font-bold text-slate-100">
+        Danh mục hàng bán qua bot
+      </h2>
+      <p class="max-w-3xl text-sm leading-6 text-slate-400">
+        Sản phẩm là digital goods khách mua trực tiếp qua bot. Mỗi sản phẩm cần
+        giá, danh mục và tồn kho rõ ràng để bot hiển thị đúng cho khách.
+      </p>
+      <p class="text-sm text-slate-500">
+        Hiện có
+        <span class="font-semibold text-slate-200"
+          >{{ products | length }}</span
+        >
+        sản phẩm đang hoạt động.
+      </p>
+    </div>
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <button
+        type="button"
+        onclick="document.getElementById('addModal').classList.remove('hidden')"
+        class="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-900 transition-all duration-200 hover:bg-emerald-600 active:scale-95"
+      >
+        Thêm sản phẩm
+      </button>
+      <a
+        href="/admin/inventory"
+        class="inline-flex items-center justify-center rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 transition-colors hover:border-slate-600 hover:text-slate-100"
+      >
+        Đi tới nhập kho
+      </a>
+    </div>
+  </div>
+</div>
+
+<form
+  method="GET"
+  action="/admin/products"
+  class="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-5"
+>
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-4 md:items-end">
+    <div class="md:col-span-2">
+      <label
+        for="productSearch"
+        class="mb-1.5 block text-sm font-medium text-slate-300"
+        >Tìm theo tên hoặc mô tả</label
+      >
+      <input
+        id="productSearch"
+        name="q"
+        value="{{ q }}"
+        placeholder="Ví dụ: Netflix, key, tài khoản..."
+        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+      />
+    </div>
+    <div>
+      <label
+        for="categoryFilter"
+        class="mb-1.5 block text-sm font-medium text-slate-300"
+        >Danh mục</label
+      >
+      <select
+        id="categoryFilter"
+        name="category_id"
+        class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-slate-100 transition-colors focus:border-emerald-500 focus:outline-none"
+      >
+        <option value="">Tất cả danh mục</option>
+        {% for c in categories %}
+        <option value="{{ c.id }}" {% if category_id == c.id %}selected{% endif %}>
+          {{ c.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <button
+      type="submit"
+      class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-900 transition-all duration-200 hover:bg-emerald-600 active:scale-95"
+    >
+      Lọc sản phẩm
+    </button>
+  </div>
+</form>
+
+<div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+  {% if products %}
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[760px] text-sm">
+      <thead>
+        <tr class="border-b border-slate-800">
+          <th
+            class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
+          >
+            ID
+          </th>
+          <th
+            class="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
+          >
+            Tên sản phẩm
+          </th>
+          <th
+            class="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
+          >
+            Danh mục
+          </th>
+          <th
+            class="px-4 py-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-500"
+          >
+            Giá
+          </th>
+          <th
+            class="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-500"
+          >
+            Tồn kho
+          </th>
+          <th
+            class="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-500"
+          >
+            Thao tác
+          </th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800/50">
+        {% for p in products %}
+        <tr class="transition-colors duration-150 hover:bg-slate-800/30">
+          <td class="px-6 py-4 font-mono text-slate-500">{{ p.id }}</td>
+          <td class="px-4 py-4">
+            <div class="font-semibold text-slate-100">{{ p.name }}</div>
+            {% if p.description %}
+            <div class="mt-0.5 max-w-xs truncate text-xs text-slate-500">
+              {{ p.description }}
+            </div>
+            {% endif %}
+          </td>
+          <td class="px-4 py-4 text-slate-300">{{ p.category.name }}</td>
+          <td class="px-4 py-4 text-right font-bold text-emerald-400">
+            {{ "{:,.0f}".format(p.price) }}đ
+          </td>
+          <td class="px-4 py-4 text-center">
+            <span
+              class="font-bold {% if p.stock == 0 %}text-red-400{% elif p.stock < 5 %}text-amber-400{% else %}text-slate-100{% endif %}"
+            >
+              {{ p.stock }}
+            </span>
+          </td>
+          <td class="px-4 py-4">
+            <div class="flex flex-wrap items-center justify-center gap-2">
+              <a
+                href="/admin/inventory?product_id={{ p.id }}"
+                class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20"
+              >
+                Nạp kho
+              </a>
+              <button
+                type="button"
+                onclick="document.getElementById('editModal{{ p.id }}').classList.remove('hidden')"
+                class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700"
+              >
+                Chỉnh sửa
+              </button>
+              <form
+                method="POST"
+                action="/admin/products/{{ p.id }}/announce"
+                onsubmit="return confirmAction('Gửi thông báo sản phẩm mới cho ' + {{ p.name|tojson }} + '?', this, 'Đang gửi...');"
+              >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <input type="hidden" name="kind" value="new" />
+                <button
+                  type="submit"
+                  class="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-1.5 text-xs font-medium text-sky-300 transition-colors hover:bg-sky-500/20"
+                >
+                  Báo hàng mới
+                </button>
+              </form>
+              <form
+                method="POST"
+                action="/admin/products/{{ p.id }}/announce"
+                onsubmit="return confirmAction('Gửi thông báo nhắc lại cho ' + {{ p.name|tojson }} + '?', this, 'Đang gửi...');"
+              >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <input type="hidden" name="kind" value="reminder" />
+                <button
+                  type="submit"
+                  class="rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/20"
+                >
+                  Nhắc lại sản phẩm
+                </button>
+              </form>
+              <form
+                method="POST"
+                action="/admin/products/{{ p.id }}/disable"
+                onsubmit="if (!confirm('Xóa sản phẩm ' + {{ p.name|tojson }} + ' khỏi shop? Sản phẩm sẽ không còn hiển thị cho khách.')) return false; setLoading(this, 'Đang xóa...'); return true;"
+              >
+                <input
+                  type="hidden"
+                  name="csrf_token"
+                  value="{{ csrf_token }}"
+                />
+                <button
+                  type="submit"
+                  class="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20"
+                >
+                  Xóa sản phẩm
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div
+    class="flex flex-col items-center justify-center px-6 py-20 text-center text-slate-500"
+  >
+    {% if q or category_id %}
+    <p class="mb-2 font-semibold text-slate-200">
+      Không tìm thấy sản phẩm phù hợp.
+    </p>
+    <p class="mb-5 text-sm">
+      Thử xoá bộ lọc hoặc thêm sản phẩm mới cho danh mục này.
+    </p>
+    <div class="flex flex-col items-center gap-3 sm:flex-row">
+      <a
+        href="/admin/products"
+        class="rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:border-slate-600 hover:text-slate-100"
+      >
+        Xoá bộ lọc
+      </a>
+      <button
+        type="button"
+        onclick="document.getElementById('addModal').classList.remove('hidden')"
+        class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-900 transition-colors hover:bg-emerald-600"
+      >
+        Thêm sản phẩm
+      </button>
+    </div>
+    {% else %}
+    <p class="mb-2 font-semibold text-slate-200">Chưa có sản phẩm nào.</p>
+    <p class="mb-5 text-sm">
+      Tạo sản phẩm đầu tiên để bắt đầu nạp kho và bán hàng.
+    </p>
+    <button
+      type="button"
+      onclick="document.getElementById('addModal').classList.remove('hidden')"
+      class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-900 transition-colors hover:bg-emerald-600"
+    >
+      Thêm sản phẩm đầu tiên
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% for p in products %}
+<div
+  id="editModal{{ p.id }}"
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+>
+  <div
+    class="admin-modal-panel flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl"
+  >
+    <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-7 py-5">
+      <h3 class="text-lg font-bold text-slate-100">Sửa sản phẩm #{{ p.id }}</h3>
+      <button
+        type="button"
+        onclick="document.getElementById('editModal{{ p.id }}').classList.add('hidden')"
+        class="text-xl leading-none text-slate-400 transition-colors hover:text-slate-100"
+      >
+        &times;
+      </button>
+    </div>
+    <div class="overflow-y-auto px-7 py-6">
+    <form
+      method="POST"
+      action="/admin/products/{{ p.id }}/edit"
+      class="grid gap-4 md:grid-cols-2"
+      onsubmit="return confirmAction('Lưu thay đổi sản phẩm #{{ p.id }}?', this, 'Đang lưu...');"
+    >
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <div>
+        <label class="mb-1.5 block text-sm font-medium text-slate-300"
+          >Tên sản phẩm</label
+        >
+        <input
+          name="name"
+          value="{{ p.name }}"
+          required
+          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label class="mb-1.5 block text-sm font-medium text-slate-300"
+          >Giá (VNĐ)</label
+        >
+        <input
+          name="price"
+          type="number"
+          min="0"
+          value="{{ p.price }}"
+          required
+          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label class="mb-1.5 block text-sm font-medium text-slate-300"
+          >Danh mục</label
+        >
+        <select
+          name="category_id"
+          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 transition-colors focus:border-emerald-500 focus:outline-none"
+        >
+          <option value="">Giữ danh mục hiện tại</option>
+          {% for c in categories %}
+          <option value="{{ c.id }}" {% if p.category_id == c.id %}selected{% endif %}>
+            {{ c.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="mb-1.5 block text-sm font-medium text-slate-300"
+          >Danh mục mới
+          <span class="text-xs text-slate-500">(tùy chọn)</span></label
+        >
+        <input
+          name="new_category"
+          placeholder="Nhập để tạo danh mục mới"
+          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label class="mb-1.5 block text-sm font-medium text-slate-300"
+          >Mô tả <span class="text-xs text-slate-500">(tùy chọn)</span></label
+        >
+        <textarea
+          name="description"
+          rows="3"
+          placeholder="Mô tả ngắn về sản phẩm..."
+          class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+        >
+{{ p.description or '' }}</textarea
+        >
+      </div>
+      <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+        <label class="flex items-start gap-3">
+          <input
+            type="checkbox"
+            name="allow_quantity_selection"
+            value="true"
+            {% if p.allow_quantity_selection %}checked{% endif %}
+            class="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500 focus:ring-emerald-500"
+          />
+          <span>
+            <span class="block text-sm font-medium text-slate-200">Cho phép khách chọn số lượng</span>
+            <span class="mt-1 block text-xs leading-5 text-slate-500">Nếu tắt, bot sẽ luôn mua 1 đơn vị cho sản phẩm này.</span>
+          </span>
+        </label>
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="mb-1.5 block text-sm font-medium text-slate-300">Mua tối thiểu</label>
+            <input
+              name="min_quantity"
+              type="number"
+              min="1"
+              value="{{ p.min_quantity or 1 }}"
+              class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="mb-1.5 block text-sm font-medium text-slate-300">Mua tối đa</label>
+            <input
+              name="max_quantity"
+              type="number"
+              min="1"
+              value="{{ p.max_quantity or 1 }}"
+              class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="grid gap-3 pt-2 sm:grid-cols-2 md:col-span-2">
+        <button
+          type="button"
+          onclick="document.getElementById('editModal{{ p.id }}').classList.add('hidden')"
+          class="rounded-xl border border-slate-700 py-2.5 text-sm font-medium text-slate-400 transition-all hover:border-slate-600 hover:text-slate-100"
+        >
+          Hủy
+        </button>
+        <button
+          type="submit"
+          class="rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-slate-900 transition-all hover:bg-emerald-600 active:scale-95"
+        >
+          Lưu thay đổi
+        </button>
+      </div>
+    </form>
+
+    <div class="mt-5 border-t border-slate-800 pt-5">
+      <div class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Thông báo tới người dùng</div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <form
+          method="POST"
+          action="/admin/products/{{ p.id }}/announce"
+          onsubmit="return confirmAction('Gửi thông báo sản phẩm mới cho ' + {{ p.name|tojson }} + '?', this, 'Đang gửi...');"
+        >
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <input type="hidden" name="kind" value="new" />
+          <button
+            type="submit"
+            class="w-full rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-2.5 text-sm font-semibold text-sky-300 transition-colors hover:bg-sky-500/20"
+          >
+            Gửi thông báo sản phẩm mới
+          </button>
+        </form>
+        <form
+          method="POST"
+          action="/admin/products/{{ p.id }}/announce"
+          onsubmit="return confirmAction('Gửi thông báo nhắc lại cho ' + {{ p.name|tojson }} + '?', this, 'Đang gửi...');"
+        >
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <input type="hidden" name="kind" value="reminder" />
+          <button
+            type="submit"
+            class="w-full rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-2.5 text-sm font-semibold text-indigo-300 transition-colors hover:bg-indigo-500/20"
+          >
+            Gửi nhắc lại sản phẩm cũ
+          </button>
+        </form>
+      </div>
+      <p class="mt-3 text-xs leading-5 text-slate-500">
+        Chỉ gửi được khi sản phẩm đang còn hàng trong kho để tránh khách bấm vào nhưng không mua được.
+      </p>
+    </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<div
+  id="addModal"
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+>
+  <div
+    class="admin-modal-panel flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl"
+  >
+    <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-7 py-5">
+      <h3 class="text-lg font-bold text-slate-100">Thêm sản phẩm mới</h3>
+      <button
+        type="button"
+        onclick="document.getElementById('addModal').classList.add('hidden')"
+        class="text-xl leading-none text-slate-400 transition-colors hover:text-slate-100"
+      >
+        &times;
+      </button>
+    </div>
+    <div class="overflow-y-auto px-7 py-6">
+    <form
+      method="POST"
+      action="/admin/products/add"
+      class="grid gap-4 md:grid-cols-2"
+      onsubmit="
+        return confirmAction(
+          'Tạo sản phẩm mới và thông báo cho khách?',
+          this,
+          'Đang lưu...',
+        );
+      "
+    >
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <div>
+        <label class="mb-1.5 block text-sm font-medium text-slate-300"
+          >Tên sản phẩm</label
+        >
+        <input
+          name="name"
+          required
+          placeholder="Vd: Netflix 1 Tháng"
+          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label class="mb-1.5 block text-sm font-medium text-slate-300"
+          >Giá (VNĐ)</label
+        >
+        <input
+          name="price"
+          type="number"
+          min="0"
+          required
+          placeholder="50000"
+          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label class="mb-1.5 block text-sm font-medium text-slate-300"
+          >Danh mục</label
+        >
+        <select
+          name="category_id"
+          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 transition-colors focus:border-emerald-500 focus:outline-none"
+        >
+          <option value="">Chọn danh mục</option>
+          {% for c in categories %}
+          <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="mb-1.5 block text-sm font-medium text-slate-300"
+          >Danh mục mới
+          <span class="text-xs text-slate-500">(tùy chọn)</span></label
+        >
+        <input
+          name="new_category"
+          placeholder="Nhập để tạo danh mục mới"
+          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label class="mb-1.5 block text-sm font-medium text-slate-300"
+          >Mô tả <span class="text-xs text-slate-500">(tùy chọn)</span></label
+        >
+        <textarea
+          name="description"
+          rows="3"
+          placeholder="Mô tả ngắn về sản phẩm..."
+          class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+        ></textarea>
+      </div>
+      <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+        <label class="flex items-start gap-3">
+          <input
+            type="checkbox"
+            name="allow_quantity_selection"
+            value="true"
+            class="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500 focus:ring-emerald-500"
+          />
+          <span>
+            <span class="block text-sm font-medium text-slate-200">Cho phép khách chọn số lượng</span>
+            <span class="mt-1 block text-xs leading-5 text-slate-500">Nếu tắt, bot sẽ luôn mua 1 đơn vị cho sản phẩm này.</span>
+          </span>
+        </label>
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="mb-1.5 block text-sm font-medium text-slate-300">Mua tối thiểu</label>
+            <input
+              name="min_quantity"
+              type="number"
+              min="1"
+              value="1"
+              class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="mb-1.5 block text-sm font-medium text-slate-300">Mua tối đa</label>
+            <input
+              name="max_quantity"
+              type="number"
+              min="1"
+              value="1"
+              class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-3 pt-2 md:col-span-2">
+        <button
+          type="button"
+          onclick="document.getElementById('addModal').classList.add('hidden')"
+          class="flex-1 rounded-xl border border-slate-700 py-2.5 text-sm font-medium text-slate-400 transition-all hover:border-slate-600 hover:text-slate-100"
+        >
+          Hủy
+        </button>
+        <button
+          type="submit"
+          class="flex-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-slate-900 transition-all hover:bg-emerald-600 active:scale-95"
+        >
+          Tạo sản phẩm
+        </button>
+      </div>
+    </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

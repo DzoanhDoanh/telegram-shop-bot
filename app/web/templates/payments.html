@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Quản lý thanh toán{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+  <div class="rounded-2xl border border-slate-800 bg-slate-900/60 px-6 py-5">
+    <h1 class="text-xl font-bold text-slate-100">Thanh toán & ví điện tử</h1>
+    <p class="mt-1 text-sm text-slate-400">Cấu hình tài khoản nhận tiền, quản lý giao dịch ví và nạp tiền cho khách hàng.</p>
+  </div>
+
+  {% if msg %}
+  <div id="toast" class="rounded-xl border border-emerald-600/40 bg-emerald-900/60 px-5 py-3 text-sm text-emerald-100">{{ msg }}</div>
+  <script>setTimeout(function(){ var t=document.getElementById('toast'); if(t) t.style.display='none'; }, 4000);</script>
+  {% endif %}
+
+  <!-- Payment config card -->
+  <form method="POST" action="/admin/payments/config" class="space-y-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-6" onsubmit="return confirmAction('Lưu cấu hình thanh toán?', this, 'Đang lưu...');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="flex items-center gap-3 border-b border-slate-800 pb-4">
+      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 text-lg">🏦</span>
+      <div>
+        <h2 class="text-base font-bold text-slate-100">Tài khoản nhận tiền</h2>
+        <p class="text-xs text-slate-400">Cập nhật thông tin ngân hàng để khách hàng chuyển khoản</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">Ngân hàng</label>
+        <input name="bank_name" value="{{ config.bank_name or '' }}" placeholder="Vietcombank, MB Bank..."
+               class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">Số tài khoản</label>
+        <input name="account_no" value="{{ config.account_no or '' }}" placeholder="0123456789"
+               class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">Tên chủ tài khoản</label>
+        <input name="account_name" value="{{ config.account_name or '' }}" placeholder="NGUYEN VAN A"
+               class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">VietQR Bank Code</label>
+        <input name="vietqr_bank_code" value="{{ config.vietqr_bank_code or '' }}" placeholder="VCB, MBB, TCB..."
+               class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">Webhook Secret</label>
+        <input type="password" name="webhook_secret" value="" placeholder="{% if config.webhook_secret %}Đang được lưu an toàn, nhập secret mới nếu muốn rotate{% else %}Secret key để xác thực webhook{% endif %}"
+               class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">
+        {% if config.webhook_secret %}
+        <p class="mt-2 text-xs text-slate-500">Secret hiện tại đang được ẩn. Chỉ nhập giá trị mới khi bạn muốn thay secret.</p>
+        {% endif %}
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">Provider</label>
+        <input name="webhook_provider" value="{{ config.webhook_provider or '' }}" placeholder="Sepay, Casso, custom..."
+               class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">
+      </div>
+    </div>
+
+    <button type="submit"
+            class="rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-bold text-slate-900 transition-all hover:bg-emerald-600 active:scale-95">
+      Lưu cấu hình
+    </button>
+  </form>
+
+  <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
+    <div class="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+      <div class="text-xs uppercase tracking-[0.18em] text-amber-300">Pending deposits</div>
+      <div class="mt-2 text-2xl font-bold text-slate-100">{{ review_counts.pending }}</div>
+    </div>
+    <div class="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+      <div class="text-xs uppercase tracking-[0.18em] text-red-300">Underpaid</div>
+      <div class="mt-2 text-2xl font-bold text-slate-100">{{ review_counts.underpaid }}</div>
+    </div>
+    <div class="rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/5 p-4">
+      <div class="text-xs uppercase tracking-[0.18em] text-fuchsia-300">Review required</div>
+      <div class="mt-2 text-2xl font-bold text-slate-100">{{ review_counts.review_required }}</div>
+    </div>
+    <div class="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+      <div class="text-xs uppercase tracking-[0.18em] text-cyan-300">Late paid</div>
+      <div class="mt-2 text-2xl font-bold text-slate-100">{{ review_counts.late_paid }}</div>
+    </div>
+  </div>
+
+  <form method="POST" action="/admin/payments/wallet-adjust" class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6" onsubmit="return confirmAction('Xác nhận điều chỉnh số dư ví?', this, 'Đang xử lý...');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="flex items-center gap-3 border-b border-slate-800 pb-4">
+      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 text-lg">🛠️</span>
+      <div>
+        <h2 class="text-base font-bold text-slate-100">Điều chỉnh ví thủ công</h2>
+        <p class="text-xs text-slate-400">Dùng cho refund, admin cộng/trừ với lý do bắt buộc.</p>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">User ID</label>
+        <input name="user_id" type="number" min="1" required class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 focus:border-emerald-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">Số tiền</label>
+        <input name="amount" type="number" min="1" required class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 focus:border-emerald-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">Hành động</label>
+        <select name="action" required class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 focus:border-emerald-500 focus:outline-none">
+          <option value="refund">Refund</option>
+          <option value="credit">Admin cộng</option>
+          <option value="debit">Admin trừ</option>
+        </select>
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">Lý do bắt buộc</label>
+        <input name="reason" required placeholder="Ví dụ: hoàn tiền đơn lỗi / bù công nợ" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none">
+      </div>
+    </div>
+    <button type="submit" class="rounded-xl bg-blue-500 px-6 py-2.5 text-sm font-bold text-white transition-all hover:bg-blue-600 active:scale-95">Thực hiện điều chỉnh</button>
+  </form>
+
+  <!-- Wallet transactions -->
+  <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center gap-3">
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 text-lg">💰</span>
+        <div>
+          <h2 class="text-base font-bold text-slate-100">Lịch sử giao dịch ví</h2>
+          <p class="text-xs text-slate-400">Giao dịch nạp, mua, hoàn trả</p>
+        </div>
+      </div>
+      <div class="flex flex-col gap-3 sm:items-end">
+        <form method="GET" action="/admin/payments" class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <input type="hidden" name="status" value="{{ current_status }}">
+          <input type="text" name="q" value="{{ current_query or '' }}" placeholder="Tìm theo user id / mã nạp / tx id / ghi chú" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none sm:min-w-[340px]">
+          <button type="submit" class="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-700">Tìm</button>
+        </form>
+        <div class="flex gap-2 flex-wrap">
+        <a href="/admin/payments?q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if not current_status %}border-emerald-500 bg-emerald-500/10 text-emerald-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Tất cả</a>
+        <a href="/admin/payments?status=pending&q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'pending' %}border-amber-500 bg-amber-500/10 text-amber-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Chờ xử lý</a>
+        <a href="/admin/payments?status=success&q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'success' %}border-emerald-500 bg-emerald-500/10 text-emerald-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Thành công</a>
+        <a href="/admin/payments?status=failed&q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'failed' %}border-red-500 bg-red-500/10 text-red-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Thất bại</a>
+        <a href="/admin/payments?status=underpaid&q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'underpaid' %}border-red-500 bg-red-500/10 text-red-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Thiếu tiền</a>
+        <a href="/admin/payments?status=review_required&q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'review_required' %}border-fuchsia-500 bg-fuchsia-500/10 text-fuchsia-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Cần review</a>
+        <a href="/admin/payments?status=late_paid&q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'late_paid' %}border-cyan-500 bg-cyan-500/10 text-cyan-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Tiền về muộn</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div class="text-xs text-slate-400">
+        Hiển thị tối đa <b>{{ per_page }}</b> giao dịch / trang, tổng <b>{{ total_count }}</b> giao dịch.
+      </div>
+      <div class="text-xs text-slate-500">
+        Trang <b>{{ current_page }}</b> / <b>{{ total_pages }}</b>
+      </div>
+    </div>
+
+    <div class="mt-4 overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-800 text-xs uppercase text-slate-500">
+          <tr>
+            <th class="px-3 py-3">ID</th>
+            <th class="px-3 py-3">Người dùng</th>
+            <th class="px-3 py-3">Loại</th>
+            <th class="px-3 py-3">Số tiền</th>
+            <th class="px-3 py-3">Trạng thái</th>
+            <th class="px-3 py-3">Mã nạp</th>
+            <th class="px-3 py-3">Provider</th>
+            <th class="px-3 py-3">Ghi chú</th>
+            <th class="px-3 py-3">Thời gian</th>
+            <th class="px-3 py-3">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {% for tx in transactions %}
+          <tr class="transition-colors hover:bg-slate-800/40">
+            <td class="px-3 py-3 font-mono text-xs text-slate-400">#{{ tx.id }}</td>
+            <td class="px-3 py-3">
+              <div class="font-medium text-slate-200">{{ tx.user.full_name if tx.user else '?' }}</div>
+              <div class="text-xs text-slate-500">@{{ tx.user.username if tx.user else '?' }}</div>
+            </td>
+            <td class="px-3 py-3">
+              {% if tx.tx_type.value == 'deposit' %}
+                <span class="rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-300">Nạp</span>
+              {% elif tx.tx_type.value == 'purchase' %}
+                <span class="rounded-full bg-purple-500/10 px-2.5 py-1 text-xs font-medium text-purple-300">Mua</span>
+              {% elif tx.tx_type.value == 'admin_credit' %}
+                <span class="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300">Admin cộng</span>
+              {% elif tx.tx_type.value == 'admin_debit' %}
+                <span class="rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-300">Admin trừ</span>
+              {% else %}
+                <span class="rounded-full bg-slate-500/10 px-2.5 py-1 text-xs font-medium text-slate-300">{{ tx.tx_type.value }}</span>
+              {% endif %}
+            </td>
+            <td class="px-3 py-3 font-semibold text-slate-100">{{ "{:,.0f}đ".format(tx.amount|float) }}</td>
+            <td class="px-3 py-3">
+              {% if tx.status.value == 'pending' %}
+                <span class="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-300">Chờ</span>
+              {% elif tx.status.value == 'success' %}
+                <span class="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300">OK</span>
+              {% elif tx.status.value == 'failed' %}
+                <span class="rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-300">Thất bại</span>
+              {% elif tx.status.value == 'underpaid' %}
+                <span class="rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-300">Thiếu tiền</span>
+              {% elif tx.status.value == 'review_required' %}
+                <span class="rounded-full bg-fuchsia-500/10 px-2.5 py-1 text-xs font-medium text-fuchsia-300">Cần review</span>
+              {% elif tx.status.value == 'late_paid' %}
+                <span class="rounded-full bg-cyan-500/10 px-2.5 py-1 text-xs font-medium text-cyan-300">Tiền về muộn</span>
+              {% else %}
+                <span class="rounded-full bg-slate-500/10 px-2.5 py-1 text-xs font-medium text-slate-300">{{ tx.status.value }}</span>
+              {% endif %}
+            </td>
+            <td class="px-3 py-3 font-mono text-xs text-slate-400">{{ tx.reference or '' }}</td>
+            <td class="px-3 py-3 text-xs text-slate-400">{{ tx.provider or '' }}{% if tx.provider_tx_id %}<div class="mt-1 font-mono text-[11px] text-slate-500">tx: {{ tx.provider_tx_id }}</div>{% endif %}</td>
+            <td class="px-3 py-3 text-xs text-slate-400 max-w-[260px]">{{ tx.note or '' }}</td>
+            <td class="px-3 py-3 text-xs text-slate-400">{{ tx.created_at.strftime('%d/%m/%Y %H:%M') if tx.created_at else '' }}</td>
+            <td class="px-3 py-3">
+              {% if tx.status.value == 'pending' %}
+                <form method="POST" action="/admin/payments/wallet-transactions/{{ tx.id }}/cancel" class="space-y-2" onsubmit="return confirmAction('Hủy giao dịch nạp tiền này?', this, 'Đang hủy...');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="reason" value="Admin hủy giao dịch pending từ trang payments">
+                  <button type="submit" class="rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20">Hủy</button>
+                </form>
+              {% else %}
+                <span class="text-xs text-slate-600">-</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not transactions %}
+          <tr>
+            <td colspan="10" class="px-3 py-6 text-center text-sm text-slate-500">Chưa có giao dịch nào</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4">
+      <div class="text-xs text-slate-500">Dùng phân trang để xem toàn bộ lịch sử giao dịch cũ hơn.</div>
+      <div class="flex items-center gap-2">
+        {% if current_page > 1 %}
+        <a href="/admin/payments?status={{ current_status }}&q={{ current_query or '' }}&page={{ current_page - 1 }}" class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:border-slate-600 hover:text-slate-100">← Trang trước</a>
+        {% endif %}
+        {% if current_page < total_pages %}
+        <a href="/admin/payments?status={{ current_status }}&q={{ current_query or '' }}&page={{ current_page + 1 }}" class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:border-slate-600 hover:text-slate-100">Trang sau →</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

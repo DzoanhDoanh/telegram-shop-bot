@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full bg-slate-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập Admin</title>
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="h-full text-slate-100 flex items-center justify-center relative overflow-hidden bg-slate-950 font-['Inter']">
+
+    <!-- Gradient Background Decors -->
+    <div class="absolute w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[120px] -top-40 -left-40"></div>
+    <div class="absolute w-[600px] h-[600px] rounded-full bg-teal-500/5 blur-[150px] -bottom-40 -right-40"></div>
+
+    <!-- Login Container -->
+    <div class="w-full max-w-md p-8 bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl relative z-10 mx-4">
+        <!-- Logo -->
+        <div class="flex flex-col items-center mb-8">
+            <div class="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center text-slate-900 font-extrabold text-2xl shadow-lg shadow-emerald-500/20 mb-4">
+                D
+            </div>
+            <h2 class="text-2xl font-bold text-slate-100">Chào mừng trở lại</h2>
+            <p class="text-sm text-slate-400 mt-1">Đăng nhập vào bảng quản trị Digital Shop</p>
+        </div>
+
+        <!-- Notification messages if any -->
+        {% if error %}
+        <div class="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-2xl flex items-center gap-2">
+            <span>⚠️</span>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <!-- Form -->
+        <form method="POST" action="/login" class="space-y-6">
+            <div>
+                <label for="password" class="block text-sm font-medium text-slate-300 mb-2">Mật khẩu Admin</label>
+                <input type="password" name="password" id="password" required placeholder="••••••••" 
+                       class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all duration-200">
+            </div>
+
+            <button type="submit" 
+                    class="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-slate-950 font-bold rounded-2xl shadow-lg shadow-emerald-500/10 transition-all duration-200">
+                Đăng Nhập
+            </button>
+        </form>
+    </div>
+
+</body>
+</html>

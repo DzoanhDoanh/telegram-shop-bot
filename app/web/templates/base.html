@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="vi" class="h-full bg-slate-950">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Digital Shop Admin{% endblock %}</title>
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #020617;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 9999px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #10b981;
+      }
+    </style>
+    {% block head %}{% endblock %}
+  </head>
+  <body class="h-full overflow-hidden bg-slate-950 text-slate-100">
+    <!-- Mobile Sidebar Backdrop -->
+    <div
+      id="sidebarBackdrop"
+      class="fixed inset-0 z-40 hidden bg-slate-950/80 backdrop-blur-sm lg:hidden"
+      onclick="closeSidebar()"
+      aria-hidden="true"
+    ></div>
+
+    <div class="flex h-full overflow-hidden">
+      <!-- Sidebar -->
+      <aside
+        id="sidebar"
+        class="fixed inset-y-0 left-0 z-50 flex w-72 -translate-x-full flex-col justify-between border-r border-slate-800 bg-slate-900 shadow-2xl shadow-slate-950/60 transition-transform duration-200 ease-out lg:static lg:z-auto lg:translate-x-0 lg:shadow-none"
+      >
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          <!-- Shop Logo/Name -->
+          <div class="border-b border-slate-800 px-5 py-5">
+            <div class="flex items-center gap-3">
+              <div
+                class="flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-500 text-lg font-extrabold text-slate-950 shadow-lg shadow-emerald-950/30"
+              >
+                D
+              </div>
+              <div class="min-w-0">
+                <div
+                  class="truncate text-base font-extrabold tracking-tight text-slate-50"
+                >
+                  Digital Shop
+                </div>
+                <div
+                  class="mt-0.5 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-400"
+                >
+                  Admin Console
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Navigation Links -->
+          <nav class="px-4 py-5">
+            <div class="space-y-7">
+              <div>
+                <div
+                  class="mb-2 px-3 text-xs font-bold uppercase tracking-[0.2em] text-slate-500"
+                >
+                  Tổng quan
+                </div>
+                <a
+                  href="/admin"
+                  class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 {% if active_page == 'dashboard' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-lg shadow-emerald-950/20{% else %}border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50{% endif %}"
+                >
+                  <span
+                    class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
+                    >📊</span
+                  >
+                  <span>Dashboard</span>
+                </a>
+              </div>
+
+              <div>
+                <div
+                  class="mb-2 px-3 text-xs font-bold uppercase tracking-[0.2em] text-slate-500"
+                >
+                  Vận hành
+                </div>
+                <div class="space-y-1.5">
+                  <a
+                    href="/admin/orders"
+                    class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 {% if active_page == 'orders' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-lg shadow-emerald-950/20{% else %}border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50{% endif %}"
+                  >
+                    <span
+                      class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
+                      >📝</span
+                    >
+                    <span>Đơn Hàng</span>
+                  </a>
+                  <a
+                    href="/admin/products"
+                    class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 {% if active_page == 'products' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-lg shadow-emerald-950/20{% else %}border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50{% endif %}"
+                  >
+                    <span
+                      class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
+                      >📦</span
+                    >
+                    <span>Sản Phẩm</span>
+                  </a>
+                  <a
+                    href="/admin/categories"
+                    class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 {% if active_page == 'categories' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-lg shadow-emerald-950/20{% else %}border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50{% endif %}"
+                  >
+                    <span
+                      class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
+                      >🏷️</span
+                    >
+                    <span>Danh Mục</span>
+                  </a>
+                  <a
+                    href="/admin/inventory"
+                    class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 {% if active_page == 'inventory' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-lg shadow-emerald-950/20{% else %}border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50{% endif %}"
+                  >
+                    <span
+                      class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
+                      >📥</span
+                    >
+                    <span>Nhập Kho</span>
+                  </a>
+                  <a
+                    href="/admin/payments"
+                    class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 {% if active_page == 'payments' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-lg shadow-emerald-950/20{% else %}border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50{% endif %}"
+                  >
+                    <span
+                      class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
+                      >💳</span
+                    >
+                    <span>Thanh Toán</span>
+                  </a>
+                </div>
+              </div>
+
+              <div>
+                <div
+                  class="mb-2 px-3 text-xs font-bold uppercase tracking-[0.2em] text-slate-500"
+                >
+                  Dữ liệu
+                </div>
+                <div
+                  class="space-y-1.5 rounded-2xl border border-slate-800 bg-slate-950/40 p-2"
+                >
+                  <a
+                    href="/admin/export/orders.csv"
+                    class="flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50"
+                  >
+                    <span
+                      class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-sm"
+                      >📄</span
+                    >
+                    <span>Đơn Hàng CSV</span>
+                  </a>
+                  <a
+                    href="/admin/export/products.csv"
+                    class="flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50"
+                  >
+                    <span
+                      class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-sm"
+                      >📄</span
+                    >
+                    <span>Sản Phẩm CSV</span>
+                  </a>
+                  <a
+                    href="/admin/export/inventory.csv"
+                    class="flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50"
+                  >
+                    <span
+                      class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-sm"
+                      >📄</span
+                    >
+                    <span>Tồn Kho CSV</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </nav>
+        </div>
+
+        <!-- Footer / Logout -->
+        <div class="border-t border-slate-800 bg-slate-900/95 p-4">
+          <a
+            href="/logout"
+            class="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-950/30 px-4 py-3 text-sm font-semibold text-slate-300 transition-all duration-200 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300"
+          >
+            <span>🚪</span>
+            <span>Đăng Xuất</span>
+          </a>
+        </div>
+      </aside>
+
+      <!-- Main Content Wrapper -->
+      <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <!-- Top bar / Header -->
+        <header
+          class="min-h-16 shrink-0 border-b border-slate-800 bg-slate-900/95 px-4 py-3 shadow-sm shadow-slate-950/20 sm:px-6 lg:px-8"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-slate-950/40 text-slate-300 transition hover:border-emerald-500/30 hover:bg-slate-800 hover:text-emerald-300 lg:hidden"
+                onclick="toggleSidebar()"
+                aria-label="Mở menu"
+                aria-controls="sidebar"
+              >
+                <span class="text-2xl leading-none">☰</span>
+              </button>
+              <div class="min-w-0">
+                <h1 class="truncate text-lg font-bold text-slate-50 sm:text-xl">
+                  {% block page_title %}{% endblock %}
+                </h1>
+                <p class="mt-0.5 text-xs font-medium text-slate-400">
+                  Web Admin Panel
+                </p>
+              </div>
+            </div>
+            <div class="flex shrink-0 items-center gap-2 sm:gap-4">
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-emerald-300"
+              >
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                Online
+              </span>
+              <span
+                class="hidden text-sm font-semibold text-slate-300 sm:inline"
+                >Administrator</span
+              >
+              <span class="text-sm font-semibold text-slate-300 sm:hidden"
+                >Admin</span
+              >
+            </div>
+          </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto bg-slate-950 p-4 sm:p-6 lg:p-8">
+          {% block content %}{% endblock %}
+        </main>
+      </div>
+    </div>
+
+    {% if msg %} {% set msg_lower = msg|lower %} {% set is_error = 'lỗi' in
+    msg_lower or 'không' in msg_lower or 'thất bại' in msg_lower or 'sai' in
+    msg_lower %}
+    <div
+      id="toast"
+      class="fixed right-4 top-20 z-50 flex max-w-sm items-start gap-3 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-2xl shadow-slate-950/50 ring-1 ring-white/5 backdrop-blur transition-all duration-300 {% if is_error %}border-red-500/30 bg-red-500/15 text-red-100{% else %}border-emerald-500/30 bg-emerald-500/15 text-emerald-100{% endif %}"
+      role="status"
+      aria-live="polite"
+    >
+      <span
+        class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full {% if is_error %}bg-red-500/20 text-red-200{% else %}bg-emerald-500/20 text-emerald-200{% endif %}"
+      >
+        {% if is_error %}!{% else %}✓{% endif %}
+      </span>
+      <span class="leading-6">{{ msg }}</span>
+    </div>
+    {% endif %}
+
+    <script>
+      function toggleSidebar() {
+        const sidebar = document.getElementById("sidebar");
+        const backdrop = document.getElementById("sidebarBackdrop");
+        if (!sidebar || !backdrop) return;
+
+        const isOpen = !sidebar.classList.contains("-translate-x-full");
+        sidebar.classList.toggle("-translate-x-full", isOpen);
+        backdrop.classList.toggle("hidden", isOpen);
+      }
+
+      function closeSidebar() {
+        const sidebar = document.getElementById("sidebar");
+        const backdrop = document.getElementById("sidebarBackdrop");
+        if (!sidebar || !backdrop) return;
+
+        sidebar.classList.add("-translate-x-full");
+        backdrop.classList.add("hidden");
+      }
+
+      function setLoading(form, label) {
+        if (!form) return true;
+
+        const button = form.querySelector(
+          'button[type="submit"], input[type="submit"]',
+        );
+        if (!button) return true;
+
+        button.disabled = true;
+        if (button.tagName === "INPUT") {
+          button.value = label;
+        } else {
+          button.dataset.originalText = button.textContent;
+          button.textContent = label;
+        }
+        return true;
+      }
+
+      function confirmAction(message, form, loadingLabel) {
+        if (!confirm(message)) return false;
+
+        setLoading(form, loadingLabel || "Đang xử lý...");
+        return true;
+      }
+
+      window.addEventListener("resize", () => {
+        if (window.innerWidth >= 1024) {
+          const backdrop = document.getElementById("sidebarBackdrop");
+          if (backdrop) backdrop.classList.add("hidden");
+        }
+      });
+
+      window.addEventListener("DOMContentLoaded", () => {
+        const toast = document.getElementById("toast");
+        if (!toast) return;
+
+        window.setTimeout(() => {
+          toast.classList.add("translate-y-2", "opacity-0");
+          window.setTimeout(() => toast.remove(), 300);
+        }, 5000);
+      });
+    </script>
+
+    {% block scripts %}{% endblock %}
+  </body>
+</html>
