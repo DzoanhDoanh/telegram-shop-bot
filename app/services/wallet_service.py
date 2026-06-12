@@ -26,8 +26,21 @@ from app.database.models import (
     WalletTxType,
 )
 from app.services import order_service
+from app.services.order_code import get_order_code
 
 logger = logging.getLogger(__name__)
+
+
+async def notify_admins(bot: Bot | None, text: str) -> None:
+    if bot is None:
+        return
+    from app.config import settings
+
+    for admin_id in settings.ADMIN_IDS:
+        try:
+            await bot.send_message(chat_id=admin_id, text=text)
+        except Exception:
+            logger.exception("Failed to send admin payment alert", extra={"admin_id": admin_id})
 
 
 @dataclass(slots=True)
@@ -222,6 +235,21 @@ def extract_bank_payload(payload: dict[str, Any]) -> tuple[Decimal, str, str | N
     return money(amount_raw), content, bank_tx_id, provider_event_id
 
 
+def build_payment_alert_text(title: str, provider: str, amount: object, content: str, bank_tx_id: str | None, note: str) -> str:
+    safe_content = escape(content[:500] or "(trống)")
+    safe_note = escape(note)
+    safe_provider = escape(provider or "unknown")
+    safe_bank_tx = escape(bank_tx_id or "unknown")
+    return (
+        f"{title}\n\n"
+        f"Nhà cung cấp: <b>{safe_provider}</b>\n"
+        f"Số tiền nhận: <b>{format_vnd(amount)}</b>\n"
+        f"Mã giao dịch ngân hàng: <code>{safe_bank_tx}</code>\n"
+        f"Nội dung chuyển khoản: <code>{safe_content}</code>\n"
+        f"Ghi chú: {safe_note}"
+    )
+
+
 async def process_bank_webhook(
     session: AsyncSession,
     provider: str,
@@ -257,6 +285,17 @@ async def process_bank_webhook(
         .limit(1)
     )
     if not tx:
+        await notify_admins(
+            bot,
+            build_payment_alert_text(
+                "⚠️ <b>Webhook không khớp mã nạp</b>",
+                provider,
+                amount,
+                content,
+                bank_tx_id,
+                "Không tìm thấy mã nạp khớp với nội dung chuyển khoản.",
+            ),
+        )
         return WalletResult(False, "Không tìm thấy mã nạp khớp với nội dung chuyển khoản.")
     if tx.status == WalletTxStatus.SUCCESS:
         return WalletResult(True, "Webhook đã xử lý trước đó, bỏ qua để tránh cộng trùng.", tx)
@@ -269,6 +308,17 @@ async def process_bank_webhook(
         tx.note = "Tiền về sau khi yêu cầu nạp ví đã bị hủy, cần review thủ công"
         await session.commit()
         await session.refresh(tx)
+        await notify_admins(
+            bot,
+            build_payment_alert_text(
+                "⚠️ <b>Tiền về sau khi yêu cầu đã hủy</b>",
+                provider,
+                amount,
+                content,
+                bank_tx_id,
+                tx.note,
+            ),
+        )
         return WalletResult(False, tx.note, tx)
     if tx.status != WalletTxStatus.PENDING:
         return WalletResult(False, "Giao dịch không còn ở trạng thái chờ nạp.", tx)
@@ -283,6 +333,17 @@ async def process_bank_webhook(
         tx.note = f"Số tiền nhận {format_vnd(amount)} nhỏ hơn yêu cầu {format_vnd(tx.amount)}"
         await session.commit()
         await session.refresh(tx)
+        await notify_admins(
+            bot,
+            build_payment_alert_text(
+                "⚠️ <b>Chuyển khoản thiếu</b>",
+                provider,
+                amount,
+                content,
+                bank_tx_id,
+                tx.note,
+            ),
+        )
         return WalletResult(False, tx.note, tx)
 
     if amount > money(tx.amount):
@@ -290,6 +351,17 @@ async def process_bank_webhook(
         tx.note = f"Nhận thừa {format_vnd(amount)} so với yêu cầu {format_vnd(tx.amount)}, cần review thủ công"
         await session.commit()
         await session.refresh(tx)
+        await notify_admins(
+            bot,
+            build_payment_alert_text(
+                "⚠️ <b>Chuyển khoản thừa</b>",
+                provider,
+                amount,
+                content,
+                bank_tx_id,
+                tx.note,
+            ),
+        )
         return WalletResult(False, tx.note, tx)
 
     tx.note = f"Matched bank transaction {bank_tx_id or 'unknown'}"
@@ -412,29 +484,42 @@ async def pay_product_with_wallet(
         return WalletResult(False, "Sản phẩm không tồn tại hoặc đã ngừng bán.")
 
     requested_quantity = max(1, int(quantity or 1))
-    if not product.allow_quantity_selection:
+    if product.delivery_mode == "fixed_content":
+        requested_quantity = 1
+    elif not product.allow_quantity_selection:
         requested_quantity = 1
 
     minimum = max(1, int(product.min_quantity or 1))
     maximum = max(minimum, int(product.max_quantity or minimum))
-    if requested_quantity < minimum:
-        return WalletResult(False, f"Số lượng tối thiểu cho sản phẩm này là {minimum}.")
-    if requested_quantity > maximum:
-        return WalletResult(False, f"Số lượng tối đa cho sản phẩm này là {maximum}.")
+    if product.delivery_mode != "fixed_content":
+        if requested_quantity < minimum:
+            return WalletResult(False, f"Số lượng tối thiểu cho sản phẩm này là {minimum}.")
+        if requested_quantity > maximum:
+            return WalletResult(False, f"Số lượng tối đa cho sản phẩm này là {maximum}.")
 
-    stock_result = await session.execute(
-        select(InventoryItem)
-        .where(
-            InventoryItem.product_id == product_id,
-            InventoryItem.is_sold == False,
+    items: list[InventoryItem] = []
+    delivered_lines = ""
+    if product.delivery_mode == "fixed_content":
+        if not (product.fixed_delivery_content or "").strip():
+            return WalletResult(False, "Sản phẩm này chưa được cấu hình nội dung giao cố định.")
+        delivered_lines = f"<code>{escape(product.fixed_delivery_content.strip())}</code>"
+    else:
+        stock_result = await session.execute(
+            select(InventoryItem)
+            .where(
+                InventoryItem.product_id == product_id,
+                InventoryItem.is_sold == False,
+            )
+            .order_by(InventoryItem.id.asc())
+            .limit(requested_quantity)
+            .with_for_update(skip_locked=True)
         )
-        .order_by(InventoryItem.id.asc())
-        .limit(requested_quantity)
-        .with_for_update(skip_locked=True)
-    )
-    items = list(stock_result.scalars().all())
-    if len(items) < requested_quantity:
-        return WalletResult(False, f"Không đủ hàng trong kho. Cần {requested_quantity}, còn {len(items)}.")
+        items = list(stock_result.scalars().all())
+        if len(items) < requested_quantity:
+            return WalletResult(False, f"Không đủ hàng trong kho. Cần {requested_quantity}, còn {len(items)}.")
+        delivered_lines = "\n".join(
+            f"{index}. <code>{escape(item.content)}</code>" for index, item in enumerate(items, 1)
+        )
 
     unit_price = money(product.price)
     total_price = money(unit_price * requested_quantity)
@@ -474,12 +559,9 @@ async def pay_product_with_wallet(
         item.order_id = order.id
     await session.flush()
 
-    delivered_lines = "\n".join(
-        f"{index}. <code>{escape(item.content)}</code>" for index, item in enumerate(items, 1)
-    )
     delivery_text = (
         f"🎉 <b>Mua hàng thành công!</b>\n\n"
-        f"Mã đơn hàng: <b>#{order.id}</b>\n"
+        f"Mã đơn hàng: <b>{escape(get_order_code(order))}</b>\n"
         f"Sản phẩm: <b>{escape(product.name)}</b>\n"
         f"Số lượng: <b>{requested_quantity}</b>\n"
         f"Số tiền: <b>{format_vnd(total_price)}</b>\n"

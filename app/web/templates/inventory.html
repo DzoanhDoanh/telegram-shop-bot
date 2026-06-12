@@ -20,6 +20,11 @@
     <div class="rounded-2xl border border-slate-800 bg-slate-900 p-7">
         <h3 class="mb-1 text-base font-bold text-slate-100">Nạp danh sách digital goods</h3>
         <p class="mb-5 text-sm text-slate-400">Chọn đúng sản phẩm, dán dữ liệu, kiểm tra số dòng hợp lệ rồi mới nạp. Mỗi dòng sẽ được giao cho đúng 1 đơn hàng.</p>
+        {% if fixed_content_products %}
+        <div class="mb-5 rounded-xl border border-sky-500/30 bg-sky-500/10 p-4 text-sm leading-6 text-sky-100">
+            <b>Lưu ý:</b> Có {{ fixed_content_products|length }} sản phẩm đang dùng <b>nội dung cố định</b> nên không xuất hiện trong danh sách nạp kho. Với các sản phẩm đó, hãy vào <b>Quản lý sản phẩm</b> để nhập nội dung ở ô <b>Nội dung giao cố định</b>.
+        </div>
+        {% endif %}
 
         <div class="mb-5 grid grid-cols-1 gap-3 text-xs leading-5 text-slate-300 sm:grid-cols-3">
             <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
@@ -104,7 +109,7 @@ Google Drive: https://drive.google.com/... | Mã truy cập: 123456</pre>
             <div class="space-y-3 text-sm leading-6 text-slate-300">
                 <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                     <div class="font-semibold text-slate-100">1. Mỗi dòng = 1 món giao</div>
-                    <div class="mt-1 text-slate-400">Một key, một tài khoản hoặc một link tải nên nằm trên đúng một dòng riêng.</div>
+                    <div class="mt-1 text-slate-400">Một key, một tài khoản hoặc một link tải riêng cho từng khách nên nằm trên đúng một dòng riêng.</div>
                 </div>
                 <div class="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                     <div class="font-semibold text-slate-100">2. Ghi đủ để khách dùng ngay</div>

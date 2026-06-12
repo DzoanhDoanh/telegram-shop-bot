@@ -30,6 +30,8 @@ def _success_keyboard() -> InlineKeyboardMarkup:
 
 
 def _clamp_quantity(product, stock: int, requested_quantity: int) -> int:
+    if getattr(product, "delivery_mode", "inventory") == "fixed_content":
+        return 1
     if not getattr(product, "allow_quantity_selection", False):
         return 1
     minimum = max(1, int(getattr(product, "min_quantity", 1) or 1))
@@ -39,7 +41,7 @@ def _clamp_quantity(product, stock: int, requested_quantity: int) -> int:
 
 def _quantity_keyboard(product, stock: int, quantity: int) -> InlineKeyboardMarkup:
     buttons: list[list[InlineKeyboardButton]] = []
-    if stock > 0 and getattr(product, "allow_quantity_selection", False):
+    if getattr(product, "delivery_mode", "inventory") != "fixed_content" and stock > 0 and getattr(product, "allow_quantity_selection", False):
         row: list[InlineKeyboardButton] = []
         if quantity > max(1, int(product.min_quantity or 1)):
             row.append(InlineKeyboardButton(text="➖ Giảm", callback_data=f"qty_{product.id}_{quantity - 1}"))
@@ -68,19 +70,22 @@ async def _render_confirmation(callback: types.CallbackQuery, product_id: int, r
             return
 
         stock = await product_service.get_stock_count(session, product_id)
-        if stock <= 0:
+        if product.delivery_mode != "fixed_content" and stock <= 0:
             await callback.answer("Sản phẩm đã hết hàng.", show_alert=True)
             return
 
-        default_quantity = int(product.min_quantity or 1) if product.allow_quantity_selection else 1
+        default_quantity = int(product.min_quantity or 1) if product.allow_quantity_selection and product.delivery_mode != "fixed_content" else 1
         quantity = _clamp_quantity(product, stock, requested_quantity or default_quantity)
         price = wallet_service.money(product.price)
         total_price = wallet_service.money(price * quantity)
         balance = wallet_service.money(user.wallet_balance)
 
-    quantity_note = "Khách không thể đổi số lượng cho sản phẩm này." if not product.allow_quantity_selection else (
-        f"Bạn có thể chọn từ <b>{int(product.min_quantity or 1)}</b> đến <b>{min(stock, max(int(product.max_quantity or 1), int(product.min_quantity or 1)))}</b> sản phẩm hoặc bấm nút nhập số lượng để gõ trực tiếp."
-    )
+    if product.delivery_mode == "fixed_content":
+        quantity_note = "Sản phẩm này dùng nội dung giao cố định, nên hệ thống luôn xử lý 1 lượt mua cho mỗi đơn hàng."
+    else:
+        quantity_note = "Khách không thể đổi số lượng cho sản phẩm này." if not product.allow_quantity_selection else (
+            f"Bạn có thể chọn từ <b>{int(product.min_quantity or 1)}</b> đến <b>{min(stock, max(int(product.max_quantity or 1), int(product.min_quantity or 1)))}</b> sản phẩm hoặc bấm nút nhập số lượng để gõ trực tiếp."
+        )
 
     await callback.message.edit_text(
         "🧾 <b>Xác nhận mua hàng</b>\n\n"
@@ -119,6 +124,9 @@ async def request_quantity_input(callback: types.CallbackQuery, state: FSMContex
         product = await product_service.get_product(session, product_id)
         if not product or not product.is_active:
             await callback.answer("Sản phẩm không tồn tại hoặc đã ngừng bán.", show_alert=True)
+            return
+        if product.delivery_mode == "fixed_content":
+            await callback.answer("Sản phẩm này dùng nội dung cố định nên không cần nhập số lượng.", show_alert=True)
             return
         stock = await product_service.get_stock_count(session, product_id)
         if stock <= 0:
@@ -256,10 +264,10 @@ async def purchase_product(callback: types.CallbackQuery, state: FSMContext):
         )
         return
 
-    order_id = result.order.id if result.order else None
+    order_code = wallet_service.get_order_code(result.order) if result.order else "N/A"
     text = (
         "✅ <b>Mua hàng thành công!</b>\n\n"
-        f"Mã đơn hàng: <b>#{order_id}</b>\n"
+        f"Mã đơn hàng: <b>{order_code}</b>\n"
         f"Sản phẩm: <b>{product_name}</b>\n"
         f"Số lượng: <b>{quantity}</b>\n"
         f"Số tiền: <b>{wallet_service.format_vnd(total_price)}</b>\n"

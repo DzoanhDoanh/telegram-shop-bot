@@ -64,6 +64,8 @@ class Product(Base):
     description: Mapped[str | None] = mapped_column(Text)
     price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(1024))
+    delivery_mode: Mapped[str] = mapped_column(String(30), default="inventory")
+    fixed_delivery_content: Mapped[str | None] = mapped_column(Text)
     allow_quantity_selection: Mapped[bool] = mapped_column(Boolean, default=False)
     min_quantity: Mapped[int] = mapped_column(Integer, default=1)
     max_quantity: Mapped[int] = mapped_column(Integer, default=1)
@@ -78,6 +80,7 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    order_code: Mapped[str | None] = mapped_column(String(20), unique=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
     quantity: Mapped[int] = mapped_column(Integer, default=1)

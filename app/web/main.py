@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, Form, Response, Header
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func, or_
+import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 from datetime import datetime, timedelta
 from html import escape
@@ -21,6 +22,7 @@ from app.database.models import (
     PaymentConfig, WalletTransaction, WalletTxStatus
 )
 from app.services import order_service, delivery_service, wallet_service
+from app.services.order_code import get_order_code
 from app.services.notification_service import (
     ANNOUNCEMENT_TYPE_NEW,
     ANNOUNCEMENT_TYPE_REMINDER,
@@ -330,6 +332,7 @@ async def orders_page(
     request: Request,
     status: str = "all",
     msg: str = "",
+    q: str = "",
     product_id: str = "",
     date_from: str = "",
     date_to: str = "",
@@ -343,7 +346,7 @@ async def orders_page(
         selected_product_id = None
 
     async with async_session() as session:
-        q = select(Order).options(
+        order_query = select(Order).options(
             selectinload(Order.product), selectinload(Order.user)
         ).order_by(Order.created_at.desc())
 
@@ -354,20 +357,30 @@ async def orders_page(
                 "cancelled": OrderStatus.CANCELLED,
             }
             if status in status_map:
-                q = q.where(Order.status == status_map[status])
+                order_query = order_query.where(Order.status == status_map[status])
 
+        if q:
+            q_norm = q.strip()
+            if q_norm:
+                order_query = order_query.where(
+                    or_(
+                        Order.order_code.ilike(f"%{q_norm}%"),
+                        func.cast(Order.id, sa.String).ilike(f"%{q_norm}%"),
+                        func.cast(Order.user_id, sa.String).ilike(f"%{q_norm}%"),
+                    )
+                )
         if selected_product_id:
-            q = q.where(Order.product_id == selected_product_id)
+            order_query = order_query.where(Order.product_id == selected_product_id)
         if date_from:
             try:
                 start = datetime.strptime(date_from, "%Y-%m-%d")
-                q = q.where(Order.created_at >= start)
+                order_query = order_query.where(Order.created_at >= start)
             except ValueError:
                 pass
         if date_to:
             try:
                 end = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
-                q = q.where(Order.created_at < end)
+                order_query = order_query.where(Order.created_at < end)
             except ValueError:
                 pass
 
@@ -376,8 +389,10 @@ async def orders_page(
         )
         products = products_result.scalars().all()
 
-        result = await session.execute(q)
+        result = await session.execute(order_query)
         orders = result.scalars().all()
+        for order in orders:
+            order.display_code = get_order_code(order)
 
     return templates.TemplateResponse(request, "orders.html", _template_context(
         request,
@@ -385,6 +400,7 @@ async def orders_page(
         orders=orders,
         products=products,
         current_status=status,
+        q=q,
         product_id=selected_product_id,
         date_from=date_from,
         date_to=date_to,
@@ -451,11 +467,12 @@ async def reject_order_web(
         order = await order_service.reject_order(session, order_id)
         if order and _bot:
             reject_reason = escape(reason.strip() or 'Thanh toán chưa hợp lệ hoặc chưa xác minh được.')
+            order_code = escape(get_order_code(order))
             try:
                 await _bot.send_message(
                     chat_id=order.user_id,
                     text=(
-                        f"❌ <b>Đơn hàng #{order_id} đã bị từ chối.</b>\n\n"
+                        f"❌ <b>Đơn hàng {order_code} đã bị từ chối.</b>\n\n"
                         f"Lý do: {reject_reason}\n\n"
                         "Vui lòng liên hệ hỗ trợ nếu bạn có thắc mắc."
                     )
@@ -464,7 +481,8 @@ async def reject_order_web(
                 pass
 
     write_audit_event(request, "order_reject", order_id=order_id)
-    return RedirectResponse(f"/admin/orders?status=pending_payment&msg=Đã từ chối đơn #{order_id}", status_code=302)
+    order_label = order.order_code if order else f"DH{order_id:06d}"
+    return RedirectResponse(f"/admin/orders?status=pending_payment&msg=Đã từ chối đơn {order_label}", status_code=302)
 
 # ── Products ──────────────────────────────────────────────────────────────────
 @app.get("/admin/products", response_class=HTMLResponse)
@@ -505,7 +523,9 @@ async def products_page(request: Request, msg: str = "", q: str = "", category_i
                 )
             ) or 0
             products.append({"id": p.id, "category_id": p.category_id, "name": p.name, "price": p.price,
-                             "description": p.description, "category": p.category, "stock": stock})
+                             "description": p.description, "category": p.category, "stock": stock,
+                             "delivery_mode": p.delivery_mode, "fixed_delivery_content": p.fixed_delivery_content,
+                             "allow_quantity_selection": p.allow_quantity_selection, "min_quantity": p.min_quantity, "max_quantity": p.max_quantity})
 
     return templates.TemplateResponse(request, "products.html", _template_context(
         request,
@@ -525,6 +545,8 @@ async def add_product_web(
     description: str = Form(""),
     category_id: int | None = Form(None),
     new_category: str = Form(""),
+    delivery_mode: str = Form("inventory"),
+    fixed_delivery_content: str = Form(""),
     allow_quantity_selection: bool = Form(False),
     min_quantity: int = Form(1),
     max_quantity: int = Form(1),
@@ -535,10 +557,16 @@ async def add_product_web(
     if not validate_csrf_token(request, csrf_token):
         return RedirectResponse('/login', status_code=302)
 
+    normalized_delivery_mode = delivery_mode if delivery_mode in {"inventory", "fixed_content"} else "inventory"
+    normalized_fixed_delivery_content = fixed_delivery_content.strip() or None
     quantity_enabled = bool(allow_quantity_selection)
     min_quantity = max(1, int(min_quantity or 1))
     max_quantity = max(min_quantity, int(max_quantity or 1))
-    if not quantity_enabled:
+    if normalized_delivery_mode == "fixed_content":
+        quantity_enabled = False
+        min_quantity = 1
+        max_quantity = 1
+    elif not quantity_enabled:
         min_quantity = 1
         max_quantity = 1
 
@@ -564,6 +592,8 @@ async def add_product_web(
             name=name.strip(),
             price=price,
             description=description.strip() or None,
+            delivery_mode=normalized_delivery_mode,
+            fixed_delivery_content=normalized_fixed_delivery_content,
             allow_quantity_selection=quantity_enabled,
             min_quantity=min_quantity,
             max_quantity=max_quantity,
@@ -586,6 +616,8 @@ async def edit_product_web(
     description: str = Form(""),
     category_id: int | None = Form(None),
     new_category: str = Form(""),
+    delivery_mode: str = Form("inventory"),
+    fixed_delivery_content: str = Form(""),
     allow_quantity_selection: bool = Form(False),
     min_quantity: int = Form(1),
     max_quantity: int = Form(1),
@@ -596,10 +628,16 @@ async def edit_product_web(
     if not validate_csrf_token(request, csrf_token):
         return RedirectResponse('/login', status_code=302)
 
+    normalized_delivery_mode = delivery_mode if delivery_mode in {"inventory", "fixed_content"} else "inventory"
+    normalized_fixed_delivery_content = fixed_delivery_content.strip() or None
     quantity_enabled = bool(allow_quantity_selection)
     min_quantity = max(1, int(min_quantity or 1))
     max_quantity = max(min_quantity, int(max_quantity or 1))
-    if not quantity_enabled:
+    if normalized_delivery_mode == "fixed_content":
+        quantity_enabled = False
+        min_quantity = 1
+        max_quantity = 1
+    elif not quantity_enabled:
         min_quantity = 1
         max_quantity = 1
 
@@ -632,6 +670,8 @@ async def edit_product_web(
         product.price = price
         product.description = description.strip() or None
         product.category_id = cat.id
+        product.delivery_mode = normalized_delivery_mode
+        product.fixed_delivery_content = normalized_fixed_delivery_content
         product.allow_quantity_selection = quantity_enabled
         product.min_quantity = min_quantity
         product.max_quantity = max_quantity
@@ -685,7 +725,7 @@ async def announce_product_web(
                 InventoryItem.is_sold == False,
             )
         ) or 0
-        if stock <= 0:
+        if product.delivery_mode != "fixed_content" and stock <= 0:
             msg = f"Không thể gửi thông báo cho sản phẩm '{product.name}' vì hiện đang hết hàng."
             return RedirectResponse(f"/admin/products?msg={quote(msg)}", status_code=302)
 
@@ -866,18 +906,24 @@ async def inventory_page(request: Request, product_id: int = None, msg: str = ""
         raw_products = result.scalars().all()
 
         products = []
+        fixed_content_products = []
         for p in raw_products:
             stock = await session.scalar(
                 select(func.count(InventoryItem.id)).where(
                     InventoryItem.product_id == p.id, InventoryItem.is_sold == False
                 )
             ) or 0
-            products.append({"id": p.id, "name": p.name, "price": p.price, "stock": stock})
+            product_info = {"id": p.id, "name": p.name, "price": p.price, "stock": stock, "delivery_mode": p.delivery_mode}
+            if p.delivery_mode == "fixed_content":
+                fixed_content_products.append(product_info)
+            else:
+                products.append(product_info)
 
     return templates.TemplateResponse(request, "inventory.html", _template_context(
         request,
         active_page="inventory",
         products=products,
+        fixed_content_products=fixed_content_products,
         selected_product_id=product_id,
         msg=msg,
     ))
@@ -922,6 +968,11 @@ async def add_inventory_web(
         product = await session.get(Product, product_id)
         if not product:
             return RedirectResponse("/admin/inventory?msg=Sản phẩm không tồn tại", status_code=302)
+        if product.delivery_mode == "fixed_content":
+            return RedirectResponse(
+                f"/admin/inventory?msg={quote('Sản phẩm này dùng nội dung cố định, không nhập kho theo từng dòng.')}",
+                status_code=302,
+            )
         product_name = product.name
         stock_before = await session.scalar(
             select(func.count(InventoryItem.id)).where(
@@ -1094,6 +1145,17 @@ async def bank_webhook(
 
         if expected_secret:
             if configured_provider == "sepay":
+                try:
+                    timestamp_value = int((x_sepay_timestamp or "").strip())
+                except ValueError:
+                    write_audit_event(request, "bank_webhook_forbidden", provider=provider, reason="invalid_timestamp")
+                    return Response("Forbidden", status_code=403)
+
+                now_ts = int(datetime.utcnow().timestamp())
+                if abs(now_ts - timestamp_value) > settings.WEBHOOK_MAX_AGE_SECONDS:
+                    write_audit_event(request, "bank_webhook_forbidden", provider=provider, reason="stale_timestamp", timestamp=timestamp_value)
+                    return Response("Forbidden", status_code=403)
+
                 hmac_message = f"{x_sepay_timestamp}.".encode("utf-8") + raw_body
                 expected_hmac = "sha256=" + hmac.new(
                     expected_secret.encode("utf-8"),

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.session import async_session
 from app.database.models import Order, OrderStatus
 from app.config import settings
+from app.handlers.admin.dashboard import _admin_dashboard_keyboard
 
 router = Router()
 
@@ -44,12 +45,7 @@ async def cb_stats(callback: types.CallbackQuery):
     async with async_session() as session:
         text = await get_stats_text(session)
         
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Trở lại", callback_data="admin_dashboard")]
-    ])
-    
-    await callback.message.edit_text(text, reply_markup=kb)
+    await callback.message.edit_text(text, reply_markup=_admin_dashboard_keyboard())
     await callback.answer()
 
 @router.callback_query(F.data == "admin_dashboard")
@@ -57,14 +53,10 @@ async def back_to_dashboard(callback: types.CallbackQuery):
     if callback.from_user.id not in settings.ADMIN_IDS:
         return
         
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📊 Thống kê", callback_data="admin_stats")]
-    ])
-    
     await callback.message.edit_text(
         "🛠 <b>Admin Dashboard</b>\n\n"
-        "Chào mừng bạn đến với khu vực quản trị. Vui lòng chọn chức năng bên dưới:",
-        reply_markup=kb
+        "Chào mừng bạn đến với khu vực quản trị. Vui lòng chọn chức năng bên dưới:\n\n"
+        "Nếu quên lệnh, bấm <b>Danh sách lệnh admin</b> hoặc gõ <code>/adminhelp</code>.",
+        reply_markup=_admin_dashboard_keyboard()
     )
     await callback.answer()

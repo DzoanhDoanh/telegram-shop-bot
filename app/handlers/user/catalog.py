@@ -67,7 +67,7 @@ def _build_support_button() -> InlineKeyboardButton | None:
 
 def _product_button_text(product, stock: int | None = None) -> str:
     text = f"{product.name} - {product.price:,.0f}đ"
-    if stock is not None:
+    if getattr(product, "delivery_mode", "inventory") != "fixed_content" and stock is not None:
         text += f" | SL: {stock}"
     return text
 
@@ -81,7 +81,9 @@ def _product_detail_text(product, stock: int) -> str:
         else "⛔ Tạm hết hàng: vui lòng liên hệ hỗ trợ hoặc quay lại sau"
     )
     quantity_note = "1 sản phẩm / lượt mua"
-    if getattr(product, "allow_quantity_selection", False):
+    if getattr(product, "delivery_mode", "inventory") == "fixed_content":
+        quantity_note = "1 sản phẩm / lượt mua"
+    elif getattr(product, "allow_quantity_selection", False):
         quantity_note = f"Cho chọn số lượng từ {int(product.min_quantity or 1)} đến {int(product.max_quantity or 1)}"
 
     text = f"📦 <b>{safe_name}</b>\n\n"
@@ -89,15 +91,17 @@ def _product_detail_text(product, stock: int) -> str:
         text += f"📝 {safe_description}\n\n"
     text += f"💰 Giá: <b>{product.price:,.0f}đ</b> / 1 sản phẩm\n"
     text += f"🔢 Số lượng mua: <b>{html.escape(quantity_note)}</b>\n"
-    text += f"📊 {stock_status}\n"
+    if getattr(product, "delivery_mode", "inventory") != "fixed_content":
+        text += f"📊 {stock_status}\n"
     return text
 
 
 def _build_product_detail_keyboard(product, stock: int) -> InlineKeyboardMarkup:
     buttons = []
-    if stock > 0:
+    can_buy = stock > 0 or getattr(product, "delivery_mode", "inventory") == "fixed_content"
+    if can_buy:
         buttons.append([InlineKeyboardButton(text="🛒 Mua ngay", callback_data=f"buy_{product.id}")])
-        if getattr(product, "allow_quantity_selection", False):
+        if getattr(product, "delivery_mode", "inventory") != "fixed_content" and getattr(product, "allow_quantity_selection", False):
             buttons.append([InlineKeyboardButton(text="⌨️ Nhập số lượng", callback_data=f"qtyinput_{product.id}")])
 
     buttons.append([InlineKeyboardButton(text="🔄 Làm mới", callback_data=f"refresh_prod_{product.id}")])

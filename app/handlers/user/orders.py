@@ -9,6 +9,7 @@ from app.database.session import async_session
 from app.config import settings
 from app.database.models import Order, User
 from app.keyboards.user_kb import get_persistent_menu_kb
+from app.services.order_code import get_order_code
 
 router = Router()
 
@@ -43,8 +44,10 @@ def _format_order(order: Order) -> str:
     payment_method = html.escape(order.payment_method or "N/A")
     payment_note = html.escape(order.payment_note or "")
 
+    order_code = html.escape(get_order_code(order))
+
     text = (
-        f"🔹 <b>Đơn #{order.id}</b>\n"
+        f"🔹 <b>Đơn {order_code}</b>\n"
         f"   Sản phẩm: {product_name}\n"
         f"   Tổng tiền: {amount:,.0f}đ\n"
         f"   Ngày tạo: {created_at}\n"
@@ -133,7 +136,7 @@ async def order_support_latest(callback: types.CallbackQuery):
 
     message = (
         "💬 <b>Hỗ trợ về đơn hàng</b>\n\n"
-        f"Mã đơn: <code>#{latest.id}</code>\n"
+        f"Mã đơn: <code>{html.escape(get_order_code(latest))}</code>\n"
         f"Sản phẩm: <b>{html.escape(latest.product.name if latest.product else 'Sản phẩm')}</b>\n"
         f"Trạng thái: <b>{STATUS_TEXT.get(latest.status.value, latest.status.value)}</b>\n"
         f"Phương thức thanh toán: <b>{html.escape(latest.payment_method or 'N/A')}</b>\n\n"

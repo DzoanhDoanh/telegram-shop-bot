@@ -7,7 +7,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 
 from app.config import settings
 from app.handlers.user import start, catalog, checkout, orders as user_orders, wallet
-from app.handlers.admin import orders as admin_orders, dashboard, stats, products, inventory, users
+from app.handlers.admin import orders as admin_orders, dashboard, stats, users
 
 logging.basicConfig(level=logging.INFO)
 
@@ -34,8 +34,6 @@ async def main():
     dp.include_router(admin_orders.router)
     dp.include_router(dashboard.router)
     dp.include_router(stats.router)
-    dp.include_router(products.router)
-    dp.include_router(inventory.router)
     dp.include_router(users.router)
 
     logging.info("Starting bot...")

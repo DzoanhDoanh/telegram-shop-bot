@@ -36,7 +36,7 @@ async def announce_product(bot: Bot | None, session: AsyncSession, product_id: i
             InventoryItem.is_sold == False,
         )
     ) or 0
-    if stock <= 0:
+    if product.delivery_mode != "fixed_content" and stock <= 0:
         return 0
 
     result = await session.execute(
@@ -55,8 +55,9 @@ async def announce_product(bot: Bot | None, session: AsyncSession, product_id: i
         f"📦 Tên: <b>{html.escape(product.name)}</b>",
         f"💰 Giá: <b>{product.price:,.0f}đ</b>",
         f"🏷 Danh mục: <b>{html.escape(category_name)}</b>",
-        f"📦 Tồn kho hiện tại: <b>{int(stock)}</b>",
     ]
+    if product.delivery_mode != "fixed_content":
+        text_parts.append(f"📦 Tồn kho hiện tại: <b>{int(stock)}</b>")
     if description:
         text_parts.extend(["", f"📝 Mô tả: {html.escape(description[:300])}"])
     text_parts.extend(["", "Bấm nút bên dưới để xem chi tiết và mua ngay."])

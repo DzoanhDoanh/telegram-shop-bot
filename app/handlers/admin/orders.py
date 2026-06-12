@@ -1,6 +1,7 @@
 from aiogram import Router, F, types
 from app.database.session import async_session
 from app.services import order_service, delivery_service
+from app.services.order_code import get_order_code
 from app.config import settings
 
 router = Router()
@@ -41,7 +42,7 @@ async def admin_reject_order(callback: types.CallbackQuery):
         try:
             await callback.bot.send_message(
                 chat_id=order.user_id,
-                text=f"❌ Đơn hàng #{order.id} của bạn đã bị từ chối. Vui lòng liên hệ hỗ trợ nếu bạn đã thanh toán."
+                text=f"❌ Đơn hàng {get_order_code(order)} của bạn đã bị từ chối. Vui lòng liên hệ hỗ trợ nếu bạn đã thanh toán."
             )
         except Exception:
             pass

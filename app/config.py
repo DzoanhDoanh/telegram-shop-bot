@@ -27,6 +27,7 @@ class Settings:
     BANK_WEBHOOK_SECRET = config('BANK_WEBHOOK_SECRET', default='')
     PAYMENT_ADMIN_PIN = config('PAYMENT_ADMIN_PIN', default='')
     APP_ENV = config('APP_ENV', default='development')
+    WEBHOOK_MAX_AGE_SECONDS = config('WEBHOOK_MAX_AGE_SECONDS', default=300, cast=int)
 
     def validate(self) -> None:
         is_production = self.APP_ENV.lower() in {'prod', 'production'}

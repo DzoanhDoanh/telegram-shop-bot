@@ -172,7 +172,8 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
               <form
                 method="POST"
                 action="/admin/products/{{ p.id }}/announce"
-                onsubmit="return confirmAction('Gửi thông báo sản phẩm mới cho ' + {{ p.name|tojson }} + '?', this, 'Đang gửi...');"
+                data-product-name="{{ p.name }}"
+                onsubmit='return confirmAction("Gửi thông báo sản phẩm mới cho " + this.dataset.productName + "?", this, "Đang gửi...");'
               >
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                 <input type="hidden" name="kind" value="new" />
@@ -186,7 +187,8 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
               <form
                 method="POST"
                 action="/admin/products/{{ p.id }}/announce"
-                onsubmit="return confirmAction('Gửi thông báo nhắc lại cho ' + {{ p.name|tojson }} + '?', this, 'Đang gửi...');"
+                data-product-name="{{ p.name }}"
+                onsubmit='return confirmAction("Gửi thông báo nhắc lại cho " + this.dataset.productName + "?", this, "Đang gửi...");'
               >
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                 <input type="hidden" name="kind" value="reminder" />
@@ -200,7 +202,8 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
               <form
                 method="POST"
                 action="/admin/products/{{ p.id }}/disable"
-                onsubmit="if (!confirm('Xóa sản phẩm ' + {{ p.name|tojson }} + ' khỏi shop? Sản phẩm sẽ không còn hiển thị cho khách.')) return false; setLoading(this, 'Đang xóa...'); return true;"
+                data-product-name="{{ p.name }}"
+                onsubmit='if (!confirm("Xóa sản phẩm " + this.dataset.productName + " khỏi shop? Sản phẩm sẽ không còn hiển thị cho khách.")) return false; setLoading(this, "Đang xóa..."); return true;'
               >
                 <input
                   type="hidden"
@@ -267,7 +270,7 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
 {% for p in products %}
 <div
   id="editModal{{ p.id }}"
-  class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+  class="fixed flex inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
 >
   <div
     class="admin-modal-panel flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl"
@@ -354,8 +357,26 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
 {{ p.description or '' }}</textarea
         >
       </div>
-      <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-        <label class="flex items-start gap-3">
+      <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 md:col-span-2">
+        <label class="mb-1.5 block text-sm font-medium text-slate-300">Kiểu giao hàng</label>
+        <select
+          name="delivery_mode"
+          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 transition-colors focus:border-emerald-500 focus:outline-none"
+        >
+          <option value="inventory" {% if p.delivery_mode != 'fixed_content' %}selected{% endif %}>Theo kho từng dòng</option>
+          <option value="fixed_content" {% if p.delivery_mode == 'fixed_content' %}selected{% endif %}>Nội dung có sẵn</option>
+        </select>
+        <p class="mt-2 text-xs leading-5 text-slate-500">Loại theo kho dùng cho key, tài khoản, mã riêng. Loại nội dung có sẵn dùng cho link tải, hướng dẫn hoặc nội dung được gửi giống nhau cho mỗi khách mua.</p>
+        <div class="mt-4">
+          <label class="mb-1.5 block text-sm font-medium text-slate-300">Nội dung gửi cho khách <span class="text-xs text-slate-500">(chỉ dùng cho loại nội dung có sẵn)</span></label>
+          <textarea
+            name="fixed_delivery_content"
+            rows="4"
+            placeholder="Ví dụ: Link tải phần mềm, mã truy cập, hướng dẫn cài đặt..."
+            class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+          >{{ p.fixed_delivery_content or '' }}</textarea>
+        </div>
+        <label class="mt-4 flex items-start gap-3">
           <input
             type="checkbox"
             name="allow_quantity_selection"
@@ -365,7 +386,7 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
           />
           <span>
             <span class="block text-sm font-medium text-slate-200">Cho phép khách chọn số lượng</span>
-            <span class="mt-1 block text-xs leading-5 text-slate-500">Nếu tắt, bot sẽ luôn mua 1 đơn vị cho sản phẩm này.</span>
+            <span class="mt-1 block text-xs leading-5 text-slate-500">Nếu chọn nội dung có sẵn thì hệ thống sẽ tự khóa số lượng về 1.</span>
           </span>
         </label>
         <div class="mt-4 grid gap-3 sm:grid-cols-2">
@@ -414,7 +435,8 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
         <form
           method="POST"
           action="/admin/products/{{ p.id }}/announce"
-          onsubmit="return confirmAction('Gửi thông báo sản phẩm mới cho ' + {{ p.name|tojson }} + '?', this, 'Đang gửi...');"
+          data-product-name="{{ p.name }}"
+          onsubmit='return confirmAction("Gửi thông báo sản phẩm mới cho " + this.dataset.productName + "?", this, "Đang gửi...");'
         >
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
           <input type="hidden" name="kind" value="new" />
@@ -428,7 +450,8 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
         <form
           method="POST"
           action="/admin/products/{{ p.id }}/announce"
-          onsubmit="return confirmAction('Gửi thông báo nhắc lại cho ' + {{ p.name|tojson }} + '?', this, 'Đang gửi...');"
+          data-product-name="{{ p.name }}"
+          onsubmit='return confirmAction("Gửi thông báo nhắc lại cho " + this.dataset.productName + "?", this, "Đang gửi...");'
         >
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
           <input type="hidden" name="kind" value="reminder" />
@@ -441,7 +464,7 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
         </form>
       </div>
       <p class="mt-3 text-xs leading-5 text-slate-500">
-        Chỉ gửi được khi sản phẩm đang còn hàng trong kho để tránh khách bấm vào nhưng không mua được.
+        Sản phẩm giao theo kho chỉ gửi được khi còn hàng. Sản phẩm nội dung có sẵn vẫn có thể gửi thông báo ngay cả khi không dùng tồn kho.
       </p>
     </div>
     </div>
@@ -451,7 +474,7 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
 
 <div
   id="addModal"
-  class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+  class="fixed flex inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
 >
   <div
     class="admin-modal-panel flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl"
@@ -540,8 +563,26 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
           class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
         ></textarea>
       </div>
-      <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-        <label class="flex items-start gap-3">
+      <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 md:col-span-2">
+        <label class="mb-1.5 block text-sm font-medium text-slate-300">Kiểu giao hàng</label>
+        <select
+          name="delivery_mode"
+          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 transition-colors focus:border-emerald-500 focus:outline-none"
+        >
+          <option value="inventory" selected>Theo kho từng dòng</option>
+          <option value="fixed_content">Nội dung có sẵn</option>
+        </select>
+        <p class="mt-2 text-xs leading-5 text-slate-500">Loại theo kho dùng cho key, tài khoản, mã riêng. Loại nội dung có sẵn dùng cho link tải, hướng dẫn hoặc nội dung được gửi giống nhau cho mỗi khách mua.</p>
+        <div class="mt-4">
+          <label class="mb-1.5 block text-sm font-medium text-slate-300">Nội dung gửi cho khách <span class="text-xs text-slate-500">(chỉ dùng cho loại nội dung có sẵn)</span></label>
+          <textarea
+            name="fixed_delivery_content"
+            rows="4"
+            placeholder="Ví dụ: Link tải phần mềm, mã truy cập, hướng dẫn cài đặt..."
+            class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+          ></textarea>
+        </div>
+        <label class="mt-4 flex items-start gap-3">
           <input
             type="checkbox"
             name="allow_quantity_selection"
@@ -550,7 +591,7 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
           />
           <span>
             <span class="block text-sm font-medium text-slate-200">Cho phép khách chọn số lượng</span>
-            <span class="mt-1 block text-xs leading-5 text-slate-500">Nếu tắt, bot sẽ luôn mua 1 đơn vị cho sản phẩm này.</span>
+            <span class="mt-1 block text-xs leading-5 text-slate-500">Nếu chọn nội dung có sẵn thì hệ thống sẽ tự khóa số lượng về 1.</span>
           </span>
         </label>
         <div class="mt-4 grid gap-3 sm:grid-cols-2">

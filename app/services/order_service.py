@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import Order, OrderStatus
+from app.services.order_code import format_order_code
 
 
 async def create_order(
@@ -20,11 +21,11 @@ async def create_order(
         payment_method=payment_method,
     )
     session.add(order)
+    await session.flush()
+    order.order_code = format_order_code(order.id)
     if commit:
         await session.commit()
         await session.refresh(order)
-    else:
-        await session.flush()
     return order
 
 

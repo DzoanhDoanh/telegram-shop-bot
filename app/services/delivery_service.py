@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database.models import InventoryItem, Order, OrderStatus
+from app.services.order_code import get_order_code
 
 logger = logging.getLogger(__name__)
 
@@ -48,17 +49,23 @@ async def _reserve_inventory(session: AsyncSession, order: Order) -> list[Invent
 
 
 def _build_delivery_text(order: Order, items: list[InventoryItem]) -> str:
-    product_name = escape(order.product.name if order.product else "sản phẩm")
+    product = order.product
+    product_name = escape(product.name if product else "sản phẩm")
+    order_code = escape(get_order_code(order))
     lines = [
-        f"🎉 <b>Đơn hàng #{order.id} đã được duyệt!</b>",
+        f"🎉 <b>Đơn hàng {order_code} đã được duyệt!</b>",
         "",
-        f"Mã đơn hàng: <b>#{order.id}</b>",
+        f"Mã đơn hàng: <b>{order_code}</b>",
         f"Sản phẩm: <b>{product_name}</b>",
         "Thông tin sản phẩm bạn nhận được:",
         "",
     ]
-    for index, item in enumerate(items, 1):
-        lines.append(f"{index}. <code>{escape(item.content)}</code>")
+    if product and getattr(product, "delivery_mode", "inventory") == "fixed_content":
+        fixed_content = (product.fixed_delivery_content or "").strip()
+        lines.append(f"<code>{escape(fixed_content)}</code>")
+    else:
+        for index, item in enumerate(items, 1):
+            lines.append(f"{index}. <code>{escape(item.content)}</code>")
     lines.extend(["", "Cảm ơn bạn đã mua sắm tại shop!"])
     return "\n".join(lines)
 
@@ -71,14 +78,20 @@ async def approve_and_deliver_order(session: AsyncSession, bot: Bot, order_id: i
     order.status = OrderStatus.PAID
     await session.flush()
 
-    items = await _reserve_inventory(session, order)
-    if len(items) < order.quantity:
-        await session.rollback()
-        return DeliveryResult(
-            False,
-            f"Không đủ hàng trong kho. Cần {order.quantity}, còn {len(items)}.",
-            order,
-        )
+    items: list[InventoryItem] = []
+    if order.product and getattr(order.product, "delivery_mode", "inventory") == "fixed_content":
+        if not (order.product.fixed_delivery_content or "").strip():
+            await session.rollback()
+            return DeliveryResult(False, "Sản phẩm này chưa được cấu hình nội dung giao cố định.", order)
+    else:
+        items = await _reserve_inventory(session, order)
+        if len(items) < order.quantity:
+            await session.rollback()
+            return DeliveryResult(
+                False,
+                f"Không đủ hàng trong kho. Cần {order.quantity}, còn {len(items)}.",
+                order,
+            )
 
     delivery_text = _build_delivery_text(order, items)
 
