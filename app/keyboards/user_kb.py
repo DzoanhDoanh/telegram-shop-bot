@@ -17,6 +17,18 @@ BTN_SHOW_MENU = "🙉 Hiện menu"
 BTN_HELP = "❓ Hướng dẫn"
 
 
+DEMO_SPIN_REWARDS = [
+    "1.000đ vào ví",
+    "2.000đ vào ví",
+    "5.000đ vào ví",
+    "Mã giảm giá 10%",
+    "Quà bí mật",
+    "Jackpot 50.000đ",
+    "Chúc bạn may mắn lần sau",
+    "Free ship tưởng tượng",
+]
+
+
 def get_persistent_menu_kb() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -68,3 +80,11 @@ def get_main_menu_kb() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="💬 Hỗ trợ", url=f"https://t.me/{support_username}"),
         ])
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+
+def get_lucky_spin_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🎯 Quay ngay", callback_data="lucky_spin_demo")],
+        ]
+    )

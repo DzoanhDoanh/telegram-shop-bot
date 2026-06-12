@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.text_decorations import html_decoration
+import random
 
 from app.config import settings
 from app.database.models import User
@@ -18,6 +19,8 @@ from app.keyboards.user_kb import (
     BTN_SHOW_MENU,
     BTN_SUPPORT,
     BTN_TERMS,
+    DEMO_SPIN_REWARDS,
+    get_lucky_spin_kb,
     get_persistent_menu_kb,
     get_show_menu_kb,
 )
@@ -86,7 +89,7 @@ async def send_terms(message: types.Message) -> None:
     await message.answer(
         "📜 <b>Điều khoản mua hàng</b>\n\n"
         "1. Shop cung cấp <b>sản phẩm số</b>, phần lớn được giao tự động ngay trong Telegram sau khi thanh toán thành công.\n"
-        "2. Người mua phải chuyển khoản <b>đúng số tiền</b> và <b>đúng mã nạp</b> mà bot cung cấp. Chuyển sai nội dung hoặc sai số tiền có thể cần kiểm tra thủ công.\n"
+        "2. Người mua phải chuyển khoản <b>đúng số tiền</b> và <b>đúng mã nạp</b> mà bot cung cấp. Chuyển sai nội dung vui lòng liên hệ shop để được hỗ trợ.\n"
         "3. Sau khi thanh toán thành công, bot sẽ giao đúng nội dung sản phẩm tương ứng ngay trong Telegram.\n"
         "4. Sau khi sản phẩm số đã giao thành công, shop chỉ hỗ trợ các lỗi hợp lệ như giao thiếu, giao sai, hoặc sự cố hệ thống có thể xác minh.\n"
         "5. Shop <b>không hoàn tiền tùy ý</b> đối với các trường hợp người dùng đổi ý sau khi đã nhận đúng sản phẩm số, trừ khi admin xác nhận có lỗi từ hệ thống hoặc từ phía shop.\n"
@@ -116,6 +119,21 @@ async def send_support(message: types.Message, state: FSMContext) -> None:
     )
 
 
+async def send_lucky_spin(message: types.Message) -> None:
+    if not await ensure_user(message):
+        return
+
+    rewards_preview = "\n".join(f"• {reward}" for reward in DEMO_SPIN_REWARDS)
+    await message.answer(
+        "🎡 <b>Vòng quay may mắn</b>\n\n"
+        "Thử vận may của bạn với một vòng quay vui vẻ ngay trong bot.\n"
+        "<b>Một vài phần thưởng có thể quay trúng:</b>\n"
+        f"{rewards_preview}\n\n"
+        "Bấm nút bên dưới để quay ngay.",
+        reply_markup=get_lucky_spin_kb(),
+    )
+
+
 @router.message(CommandStart())
 async def cmd_start(message: types.Message):
     if not await ensure_user(message):
@@ -133,6 +151,11 @@ async def cmd_help(message: types.Message):
 @router.message(F.text == BTN_TERMS)
 async def cmd_terms(message: types.Message):
     await send_terms(message)
+
+
+@router.message(Command("vongquaymayman"))
+async def cmd_lucky_spin(message: types.Message):
+    await send_lucky_spin(message)
 
 
 @router.message(Command("support"))
@@ -223,3 +246,22 @@ async def cmd_orders(message: types.Message):
     if not await ensure_user(message):
         return
     await send_user_orders(message)
+
+
+@router.callback_query(F.data == "lucky_spin_demo")
+async def lucky_spin_demo(callback: types.CallbackQuery):
+    if not callback.message:
+        await callback.answer("Không thể thực hiện vòng quay lúc này.", show_alert=True)
+        return
+    if not await ensure_user(callback.message):
+        await callback.answer()
+        return
+
+    reward = random.choice(DEMO_SPIN_REWARDS)
+    await callback.answer("Vòng quay đã dừng!", show_alert=False)
+    await callback.message.answer(
+        "🎉 <b>Kết quả vòng quay may mắn</b>\n\n"
+        f"Bạn quay trúng: <b>{html_decoration.quote(reward)}</b>\n\n"
+        "Không có thưởng thật đâu. Lêu lêu.",
+        reply_markup=get_lucky_spin_kb(),
+    )
