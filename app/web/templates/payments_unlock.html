@@ -16,6 +16,11 @@
 
   <form method="POST" action="/admin/payments/unlock" class="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg shadow-slate-950/20">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="return_to" value="{{ return_to or '/admin/payments' }}">
+    <input type="hidden" name="user_id" value="{{ user_id or '' }}">
+    <input type="hidden" name="action" value="{{ action or '' }}">
+    <input type="hidden" name="amount" value="{{ amount or '' }}">
+    <input type="hidden" name="reason" value="{{ reason or '' }}">
     <label class="mb-1.5 block text-sm font-medium text-slate-300">Mã bảo vệ thanh toán</label>
     <input type="password" name="pin" required autofocus placeholder="Nhập PAYMENT_ADMIN_PIN"
            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none">

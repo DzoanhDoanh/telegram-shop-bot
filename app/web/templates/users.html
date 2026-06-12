@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Người dùng — Admin{% endblock %}
+{% block page_title %}Quản lý người dùng{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <div class="rounded-2xl border border-slate-800 bg-slate-900/60 px-6 py-5">
+    <h1 class="text-xl font-bold text-slate-100">Người dùng & số dư ví</h1>
+    <p class="mt-1 text-sm text-slate-400">Tìm kiếm khách hàng, kiểm tra trạng thái tài khoản, cộng trừ ví và mở nhanh lịch sử liên quan.</p>
+  </div>
+
+  {% if msg %}
+  <div id="toast" class="rounded-xl border border-emerald-600/40 bg-emerald-900/60 px-5 py-3 text-sm text-emerald-100">{{ msg }}</div>
+  <script>setTimeout(function(){ var t=document.getElementById('toast'); if(t) t.style.display='none'; }, 4000);</script>
+  {% endif %}
+
+  <form method="GET" action="/admin/users" class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="text-base font-bold text-slate-100">Bộ lọc người dùng</h2>
+        <p class="text-xs text-slate-400">Tìm theo user ID, username hoặc tên hiển thị.</p>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <a href="/admin/users?q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if not current_status %}border-emerald-500 bg-emerald-500/10 text-emerald-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Tất cả</a>
+        <a href="/admin/users?status=active&q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'active' %}border-emerald-500 bg-emerald-500/10 text-emerald-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Đang hoạt động</a>
+        <a href="/admin/users?status=banned&q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'banned' %}border-red-500 bg-red-500/10 text-red-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Đã bị cấm</a>
+      </div>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_180px]">
+      <input type="text" name="q" value="{{ current_query or '' }}" placeholder="Ví dụ: 7623630839, username, tên người dùng..."
+             class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none">
+      <button type="submit" class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-900 transition-all hover:bg-emerald-600 active:scale-95">Lọc người dùng</button>
+    </div>
+  </form>
+
+  <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div class="text-xs text-slate-400">Hiển thị tối đa <b>{{ per_page }}</b> user / trang, tổng <b>{{ total_count }}</b> user.</div>
+      <div class="text-xs text-slate-500">Trang <b>{{ current_page }}</b> / <b>{{ total_pages }}</b></div>
+    </div>
+
+    <div class="mt-4 overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-800 text-xs uppercase text-slate-500">
+          <tr>
+            <th class="px-3 py-3">User ID</th>
+            <th class="px-3 py-3">Người dùng</th>
+            <th class="px-3 py-3">Số dư ví</th>
+            <th class="px-3 py-3">Tổng chi</th>
+            <th class="px-3 py-3">Ngày tham gia</th>
+            <th class="px-3 py-3">Trạng thái</th>
+            <th class="px-3 py-3">Xem nhanh</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {% for user in users %}
+          <tr class="transition-colors hover:bg-slate-800/40 align-top">
+            <td class="px-3 py-3 font-mono text-xs text-slate-300">{{ user.id }}</td>
+            <td class="px-3 py-3">
+              <a href="/admin/users/{{ user.id }}" class="block rounded-lg transition-colors hover:bg-slate-800/40 -mx-2 px-2 py-1">
+                <div class="font-medium text-slate-200 hover:text-emerald-300">{{ user.full_name or 'Chưa có tên' }}</div>
+                <div class="text-xs text-slate-500">@{{ user.username or 'không có username' }}</div>
+              </a>
+            </td>
+            <td class="px-3 py-3 font-semibold text-emerald-300">{{ "{:,.0f}".format(user.wallet_balance|float) }}đ</td>
+            <td class="px-3 py-3 font-semibold text-slate-100">{{ "{:,.0f}".format(user.total_spent|float) }}đ</td>
+            <td class="px-3 py-3 text-xs text-slate-400">{{ user.created_at.strftime('%d/%m/%Y %H:%M') if user.created_at else '' }}</td>
+            <td class="px-3 py-3">
+              {% if user.is_banned %}
+              <span class="rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-300">Đã bị cấm</span>
+              {% else %}
+              <span class="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300">Đang hoạt động</span>
+              {% endif %}
+            </td>
+            <td class="px-3 py-3">
+              <div class="flex flex-wrap gap-2 min-w-[220px]">
+                <a href="/admin/users/{{ user.id }}" class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800">Chi tiết</a>
+                <a href="/admin/orders?q={{ user.id }}" class="rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-300 transition-colors hover:bg-indigo-500/20">Đơn hàng</a>
+                <a href="/admin/payments?q={{ user.id }}" class="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-300 transition-colors hover:bg-sky-500/20">Giao dịch ví</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4 text-sm">
+      <div class="text-slate-500">Điều hướng trang</div>
+      <div class="flex flex-wrap gap-2">
+        {% if current_page > 1 %}
+        <a href="/admin/users?status={{ current_status }}&q={{ current_query }}&page={{ current_page - 1 }}" class="rounded-lg border border-slate-700 px-3 py-1.5 text-slate-300 hover:border-slate-600 hover:bg-slate-800">← Trang trước</a>
+        {% endif %}
+        {% if current_page < total_pages %}
+        <a href="/admin/users?status={{ current_status }}&q={{ current_query }}&page={{ current_page + 1 }}" class="rounded-lg border border-slate-700 px-3 py-1.5 text-slate-300 hover:border-slate-600 hover:bg-slate-800">Trang sau →</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

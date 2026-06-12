@@ -19,7 +19,7 @@ from app.config import settings
 from app.database.session import async_session
 from app.database.models import (
     User, Category, Product, Order, InventoryItem, OrderStatus,
-    PaymentConfig, WalletTransaction, WalletTxStatus
+    PaymentConfig, WalletTransaction, WalletTxStatus, WalletTxType
 )
 from app.services import order_service, delivery_service, wallet_service
 from app.services.order_code import get_order_code
@@ -1197,36 +1197,70 @@ async def bank_webhook(
 
 # ── Wallet & payment admin ────────────────────────────────────────────────────
 @app.get("/admin/payments/unlock", response_class=HTMLResponse)
-async def payments_unlock_page(request: Request, error: str = ""):
+async def payments_unlock_page(
+    request: Request,
+    error: str = "",
+    return_to: str = "/admin/payments",
+    user_id: str = "",
+    action: str = "",
+    amount: str = "",
+    reason: str = "",
+):
     if not is_authenticated(request):
         return _redirect_login()
     return templates.TemplateResponse(request, "payments_unlock.html", _template_context(
         request,
         active_page="payments",
         error=error,
+        return_to=return_to,
+        user_id=user_id,
+        action=action,
+        amount=amount,
+        reason=reason,
     ))
 
 
 @app.post("/admin/payments/unlock")
-async def payments_unlock_web(request: Request, csrf_token: str = Form(...), pin: str = Form(...)):
+async def payments_unlock_web(
+    request: Request,
+    csrf_token: str = Form(...),
+    pin: str = Form(...),
+    return_to: str = Form("/admin/payments"),
+    user_id: str = Form(""),
+    action: str = Form(""),
+    amount: str = Form(""),
+    reason: str = Form(""),
+):
     if not is_authenticated(request):
         return _redirect_login()
     if not validate_csrf_token(request, csrf_token):
         return Response("CSRF token không hợp lệ", status_code=403)
 
     ip = client_ip(request)
+    unlock_query = f"return_to={quote(return_to or '/admin/payments', safe='')}" \
+        f"&user_id={quote(user_id, safe='')}&action={quote(action, safe='')}" \
+        f"&amount={quote(amount, safe='')}&reason={quote(reason, safe='')}"
+
     if _payment_unlock_limited(ip):
         write_audit_event(request, "payment_unlock_rate_limited")
-        return RedirectResponse("/admin/payments/unlock?error=Bạn nhập sai quá nhiều lần, vui lòng thử lại sau", status_code=302)
+        return RedirectResponse(f"/admin/payments/unlock?error=Bạn nhập sai quá nhiều lần, vui lòng thử lại sau&{unlock_query}", status_code=302)
 
     expected_pin = settings.PAYMENT_ADMIN_PIN
     if not expected_pin or not hmac.compare_digest(pin, expected_pin):
         _record_payment_unlock_failure(ip)
         write_audit_event(request, "payment_unlock_failed")
-        return RedirectResponse("/admin/payments/unlock?error=Mã bảo vệ không đúng", status_code=302)
+        return RedirectResponse(f"/admin/payments/unlock?error=Mã bảo vệ không đúng&{unlock_query}", status_code=302)
 
     write_audit_event(request, "payment_unlock_success")
-    response = RedirectResponse("/admin/payments", status_code=302)
+    target_url = return_to or "/admin/payments"
+    if target_url.startswith("/admin/users/") and user_id:
+        joiner = "&" if "?" in target_url else "?"
+        target_url = (
+            f"{target_url}{joiner}prefill_action={quote(action, safe='')}"
+            f"&prefill_amount={quote(amount, safe='')}"
+            f"&prefill_reason={quote(reason, safe='')}"
+        )
+    response = RedirectResponse(target_url, status_code=302)
     _set_payment_access(response)
     return response
 
@@ -1393,6 +1427,176 @@ async def wallet_adjustment_web(
 
     write_audit_event(request, "wallet_adjustment", actor=actor, user_id=user_id, amount=amount, adjustment_type=action, success=result.success, reason=reason, tx_id=result.transaction.id if result.transaction else None)
     return _redirect_back("/admin/payments", result.message)
+
+
+@app.get("/admin/users", response_class=HTMLResponse)
+async def users_page(request: Request, msg: str = "", status: str = "", q: str = "", page: int = 1):
+    if not is_authenticated(request):
+        return _redirect_login()
+
+    page = max(page, 1)
+    per_page = 30
+    filters = []
+    keyword = q.strip()
+
+    if status == "active":
+        filters.append(User.is_banned == False)
+    elif status == "banned":
+        filters.append(User.is_banned == True)
+
+    if keyword:
+        search_filters = [
+            User.username.ilike(f"%{keyword}%"),
+            User.full_name.ilike(f"%{keyword}%"),
+        ]
+        if keyword.isdigit():
+            search_filters.append(User.id == int(keyword))
+        filters.append(or_(*search_filters))
+
+    async with async_session() as session:
+        total_count = await session.scalar(select(func.count(User.id)).where(*filters)) or 0
+        total_pages = max((total_count + per_page - 1) // per_page, 1)
+        if page > total_pages:
+            page = total_pages
+
+        result = await session.execute(
+            select(User)
+            .where(*filters)
+            .order_by(User.created_at.desc(), User.id.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+        )
+        users = result.scalars().all()
+
+    return templates.TemplateResponse(request, "users.html", _template_context(
+        request,
+        active_page="users",
+        users=users,
+        msg=msg,
+        current_status=status,
+        current_query=q,
+        current_page=page,
+        total_pages=total_pages,
+        total_count=total_count,
+        per_page=per_page,
+    ))
+
+
+@app.get("/admin/users/{user_id}", response_class=HTMLResponse)
+async def user_detail_page(user_id: int, request: Request, msg: str = ""):
+    if not is_authenticated(request):
+        return _redirect_login()
+
+    async with async_session() as session:
+        user = await session.get(User, user_id)
+        if not user:
+            return _redirect_back("/admin/users", "Không tìm thấy người dùng")
+
+        recent_orders_result = await session.execute(
+            select(Order)
+            .options(selectinload(Order.product))
+            .where(Order.user_id == user_id)
+            .order_by(Order.created_at.desc())
+            .limit(10)
+        )
+        recent_orders = recent_orders_result.scalars().all()
+
+        recent_transactions_result = await session.execute(
+            select(WalletTransaction)
+            .where(WalletTransaction.user_id == user_id)
+            .order_by(WalletTransaction.created_at.desc())
+            .limit(10)
+        )
+        recent_transactions = recent_transactions_result.scalars().all()
+
+        order_count = await session.scalar(select(func.count(Order.id)).where(Order.user_id == user_id)) or 0
+
+    pref_action = request.query_params.get("prefill_action", "")
+    pref_amount = request.query_params.get("prefill_amount", "")
+    pref_reason = request.query_params.get("prefill_reason", "")
+
+    return templates.TemplateResponse(request, "user_detail.html", _template_context(
+        request,
+        active_page="users",
+        user=user,
+        recent_orders=recent_orders,
+        recent_transactions=recent_transactions,
+        order_count=order_count,
+        msg=msg,
+        prefill_action=pref_action,
+        prefill_amount=pref_amount,
+        prefill_reason=pref_reason,
+    ))
+
+
+@app.post("/admin/users/{user_id}/toggle-ban")
+async def toggle_user_ban_web(user_id: int, request: Request, csrf_token: str = Form(...), ban_action: str = Form(...)):
+    if not is_authenticated(request):
+        return _redirect_login()
+    if not validate_csrf_token(request, csrf_token):
+        return Response("CSRF token không hợp lệ", status_code=403)
+
+    async with async_session() as session:
+        user = await session.get(User, user_id)
+        if not user:
+            return _redirect_back("/admin/users", "Không tìm thấy người dùng")
+        if ban_action == "ban":
+            user.is_banned = True
+            msg = f"Đã cấm user {user_id}"
+            audit_action = "web_user_ban"
+        elif ban_action == "unban":
+            user.is_banned = False
+            msg = f"Đã mở cấm user {user_id}"
+            audit_action = "web_user_unban"
+        else:
+            return _redirect_back(f"/admin/users/{user_id}", "Hành động không hợp lệ")
+        await session.commit()
+
+    write_audit_event(request, audit_action, target_user_id=user_id)
+    referer = request.headers.get("referer", "")
+    if f"/admin/users/{user_id}" in referer:
+        return _redirect_back(f"/admin/users/{user_id}", msg)
+    return _redirect_back("/admin/users", msg)
+
+
+@app.post("/admin/users/{user_id}/wallet-adjust")
+async def user_wallet_adjustment_web(
+    user_id: int,
+    request: Request,
+    csrf_token: str = Form(...),
+    amount: str = Form(...),
+    action: str = Form(...),
+    reason: str = Form(...),
+):
+    if not is_authenticated(request):
+        return _redirect_login()
+    if not _has_payment_access(request):
+        unlock_url = (
+            f"/admin/payments/unlock?return_to={quote(f'/admin/users/{user_id}', safe='')}"
+            f"&user_id={user_id}&action={quote(action, safe='')}"
+            f"&amount={quote(amount, safe='')}&reason={quote(reason, safe='')}"
+        )
+        return RedirectResponse(unlock_url, status_code=302)
+    if not validate_csrf_token(request, csrf_token):
+        return Response("CSRF token không hợp lệ", status_code=403)
+
+    actor = get_admin_actor(request)
+    tx_type_map = {
+        "refund": WalletTxType.REFUND,
+        "credit": WalletTxType.ADMIN_CREDIT,
+        "debit": WalletTxType.ADMIN_DEBIT,
+    }
+    tx_type = tx_type_map.get(action)
+    if not tx_type:
+        return _redirect_back(f"/admin/users/{user_id}", "Loại điều chỉnh ví không hợp lệ")
+
+    async with async_session() as session:
+        result = await wallet_service.adjust_wallet_balance(session, user_id, amount, tx_type, actor, reason)
+
+    write_audit_event(request, "user_wallet_adjustment", actor=actor, user_id=user_id, amount=amount, adjustment_type=action, success=result.success, reason=reason, tx_id=result.transaction.id if result.transaction else None)
+    referer = request.headers.get("referer", "")
+    target = f"/admin/users/{user_id}" if f"/admin/users/{user_id}" in referer else "/admin/users"
+    return _redirect_back(target, result.message)
 
 
 # ── Root redirect ─────────────────────────────────────────────────────────────
