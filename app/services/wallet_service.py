@@ -25,7 +25,7 @@ from app.database.models import (
     WalletTxStatus,
     WalletTxType,
 )
-from app.services import order_service
+from app.services import order_payment_service, order_service, payment_policy_service, voucher_service
 from app.services.order_code import get_order_code
 
 logger = logging.getLogger(__name__)
@@ -59,6 +59,45 @@ def money(value: object) -> Decimal:
 
 def format_vnd(value: object) -> str:
     return f"{float(money(value)):,.0f}đ"
+
+
+def get_order_status_label(status: OrderStatus | str | None) -> str:
+    value = status.value if hasattr(status, "value") else str(status or "")
+    labels = {
+        "pending_payment": "Chờ thanh toán",
+        "paid": "Đã thanh toán",
+        "completed": "Hoàn thành",
+        "cancelled": "Đã hủy",
+        "refunded": "Đã hoàn tiền",
+    }
+    return labels.get(value, value or "Không xác định")
+
+
+def get_wallet_tx_type_label(tx_type: WalletTxType | str | None) -> str:
+    value = tx_type.value if hasattr(tx_type, "value") else str(tx_type or "")
+    labels = {
+        "deposit": "Nạp ví",
+        "purchase": "Mua hàng",
+        "refund": "Hoàn tiền",
+        "admin_credit": "Admin cộng",
+        "admin_debit": "Admin trừ",
+    }
+    return labels.get(value, value or "Khác")
+
+
+def get_wallet_status_label(status: WalletTxStatus | str | None) -> str:
+    value = status.value if hasattr(status, "value") else str(status or "")
+    labels = {
+        "pending": "Chờ xử lý",
+        "success": "Thành công",
+        "failed": "Thất bại",
+        "cancelled": "Đã hủy",
+        "underpaid": "Chuyển khoản thiếu",
+        "review_required": "Cần kiểm tra thủ công",
+        "unmatched": "Không khớp giao dịch",
+        "late_paid": "Tiền về muộn",
+    }
+    return labels.get(value, value or "Không xác định")
 
 
 async def get_active_payment_config(session: AsyncSession) -> PaymentConfig | None:
@@ -250,6 +289,72 @@ def build_payment_alert_text(title: str, provider: str, amount: object, content:
     )
 
 
+async def _process_direct_bank_order_webhook(
+    session: AsyncSession,
+    provider: str,
+    payload: dict[str, Any],
+    amount,
+    content: str,
+    normalized_content: str,
+    bank_tx_id: str | None,
+    provider_event_id: str | None,
+    bot: Bot | None = None,
+) -> WalletResult | None:
+    order = await session.scalar(
+        select(Order)
+        .options(selectinload(Order.product), selectinload(Order.user))
+        .where(
+            Order.payment_method == payment_policy_service.PAYMENT_METHOD_DIRECT_BANK,
+            Order.bank_transfer_reference_normalized.is_not(None),
+            Order.bank_transfer_reference_normalized == normalized_content,
+        )
+        .limit(1)
+    )
+    if not order:
+        return None
+    if order.status == OrderStatus.COMPLETED:
+        return WalletResult(True, "Đơn chuyển khoản đã được xử lý trước đó.", order=order)
+    if order.status not in {OrderStatus.PENDING_PAYMENT, OrderStatus.PAID}:
+        return WalletResult(False, "Đơn chuyển khoản không còn ở trạng thái chờ xử lý.", order=order)
+    if amount < money(order.total_amount):
+        order.payment_note = f"Chuyển khoản thiếu: nhận {format_vnd(amount)}, cần {format_vnd(order.total_amount)}"
+        await session.commit()
+        await session.refresh(order)
+        return WalletResult(False, order.payment_note, order=order)
+    if amount > money(order.total_amount):
+        order.payment_note = f"Chuyển khoản thừa: nhận {format_vnd(amount)}, cần {format_vnd(order.total_amount)}. Cần review thủ công."
+        await session.commit()
+        await session.refresh(order)
+        await notify_admins(
+            bot,
+            build_payment_alert_text(
+                "⚠️ <b>Đơn direct bank nhận thừa tiền</b>",
+                provider,
+                amount,
+                content,
+                bank_tx_id,
+                order.payment_note,
+            ),
+        )
+        return WalletResult(False, order.payment_note, order=order)
+    if not bot:
+        return WalletResult(False, "Bot chưa sẵn sàng để giao đơn direct bank.", order=order)
+
+    paid_result = await order_payment_service.mark_order_paid(
+        session=session,
+        order=order,
+        payment_method=payment_policy_service.PAYMENT_METHOD_DIRECT_BANK,
+        payment_note=f"Webhook {provider}: matched {bank_tx_id or provider_event_id or 'unknown'}",
+    )
+    if not paid_result.success:
+        return WalletResult(False, paid_result.message, order=order)
+    complete_result = await order_payment_service.complete_paid_order(session, bot, order)
+    if not complete_result.success:
+        return WalletResult(False, complete_result.message, order=order)
+    await session.refresh(order)
+    return WalletResult(True, "Đã xác nhận và giao đơn chuyển khoản trực tiếp.", order=order)
+
+
 async def process_bank_webhook(
     session: AsyncSession,
     provider: str,
@@ -258,6 +363,20 @@ async def process_bank_webhook(
 ) -> WalletResult:
     amount, content, bank_tx_id, provider_event_id = extract_bank_payload(payload)
     normalized_content = normalize_reference_text(content)
+
+    direct_bank_result = await _process_direct_bank_order_webhook(
+        session=session,
+        provider=provider,
+        payload=payload,
+        amount=amount,
+        content=content,
+        normalized_content=normalized_content,
+        bank_tx_id=bank_tx_id,
+        provider_event_id=provider_event_id,
+        bot=bot,
+    )
+    if direct_bank_result is not None:
+        return direct_bank_result
 
     duplicate_result = await session.execute(
         select(WalletTransaction)
@@ -288,15 +407,15 @@ async def process_bank_webhook(
         await notify_admins(
             bot,
             build_payment_alert_text(
-                "⚠️ <b>Webhook không khớp mã nạp</b>",
+                "⚠️ <b>Webhook không khớp mã nạp hoặc mã đơn</b>",
                 provider,
                 amount,
                 content,
                 bank_tx_id,
-                "Không tìm thấy mã nạp khớp với nội dung chuyển khoản.",
+                "Không tìm thấy mã nạp ví hoặc mã đơn direct bank khớp với nội dung chuyển khoản.",
             ),
         )
-        return WalletResult(False, "Không tìm thấy mã nạp khớp với nội dung chuyển khoản.")
+        return WalletResult(False, "Không tìm thấy mã nạp ví hoặc mã đơn khớp với nội dung chuyển khoản.")
     if tx.status == WalletTxStatus.SUCCESS:
         return WalletResult(True, "Webhook đã xử lý trước đó, bỏ qua để tránh cộng trùng.", tx)
     if tx.status == WalletTxStatus.CANCELLED:
@@ -305,6 +424,7 @@ async def process_bank_webhook(
         tx.provider_tx_id = bank_tx_id
         tx.provider_event_id = provider_event_id
         tx.raw_payload = payload
+        tx.completed_at = datetime.utcnow()
         tx.note = "Tiền về sau khi yêu cầu nạp ví đã bị hủy, cần review thủ công"
         await session.commit()
         await session.refresh(tx)
@@ -330,6 +450,7 @@ async def process_bank_webhook(
 
     if amount < money(tx.amount):
         tx.status = WalletTxStatus.UNDERPAID
+        tx.completed_at = datetime.utcnow()
         tx.note = f"Số tiền nhận {format_vnd(amount)} nhỏ hơn yêu cầu {format_vnd(tx.amount)}"
         await session.commit()
         await session.refresh(tx)
@@ -348,6 +469,7 @@ async def process_bank_webhook(
 
     if amount > money(tx.amount):
         tx.status = WalletTxStatus.REVIEW_REQUIRED
+        tx.completed_at = datetime.utcnow()
         tx.note = f"Nhận thừa {format_vnd(amount)} so với yêu cầu {format_vnd(tx.amount)}, cần review thủ công"
         await session.commit()
         await session.refresh(tx)
@@ -369,6 +491,8 @@ async def process_bank_webhook(
     if credit_result.success and credit_result.transaction:
         credit_result.transaction.provider_tx_id = bank_tx_id
         credit_result.transaction.provider_event_id = provider_event_id
+        credit_result.transaction.provider = provider
+        credit_result.transaction.raw_payload = payload
         await session.commit()
     if credit_result.success and bot:
         try:
@@ -466,12 +590,74 @@ async def adjust_wallet_balance(
     return WalletResult(True, "Đã cập nhật số dư ví.", tx)
 
 
+async def refund_order_to_wallet(
+    session: AsyncSession,
+    order_id: int,
+    actor: str,
+    reason: str,
+) -> WalletResult:
+    clean_reason = reason.strip()
+    if not clean_reason:
+        return WalletResult(False, "Phải nhập lý do hoàn tiền.")
+
+    order_result = await session.execute(
+        select(Order)
+        .options(selectinload(Order.user))
+        .where(Order.id == order_id)
+        .with_for_update()
+    )
+    order = order_result.scalar_one_or_none()
+    if not order:
+        return WalletResult(False, "Không tìm thấy đơn hàng.")
+    if order.status == OrderStatus.REFUNDED:
+        return WalletResult(False, "Đơn hàng này đã được hoàn tiền trước đó.")
+    if order.status not in {OrderStatus.COMPLETED, OrderStatus.PAID}:
+        return WalletResult(False, "Chỉ có thể hoàn tiền cho đơn đã thanh toán hoặc đã hoàn thành.")
+
+    user = await session.get(User, order.user_id, with_for_update=True)
+    if not user:
+        return WalletResult(False, "Không tìm thấy người dùng.")
+
+    amount_value = money(order.total_amount)
+    user.wallet_balance = money(user.wallet_balance) + amount_value
+    if money(user.total_spent) >= amount_value:
+        user.total_spent = money(user.total_spent) - amount_value
+    else:
+        user.total_spent = money(0)
+
+    now = datetime.utcnow()
+    tx = WalletTransaction(
+        user_id=order.user_id,
+        tx_type=WalletTxType.REFUND,
+        amount=amount_value,
+        status=WalletTxStatus.SUCCESS,
+        reference=f"RFD{order.user_id}-{order.id}-{int(now.timestamp())}",
+        provider="admin",
+        note=f"Hoàn tiền đơn {get_order_code(order)}: {clean_reason}",
+        admin_actor=actor,
+        completed_at=now,
+    )
+    session.add(tx)
+
+    order.status = OrderStatus.REFUNDED
+    order.completed_at = now
+    existing_note = (order.payment_note or "").strip()
+    refund_note = f"Hoàn tiền: {clean_reason}"
+    order.payment_note = f"{existing_note}\n{refund_note}".strip() if existing_note else refund_note
+
+    await session.commit()
+    await session.refresh(tx)
+    await session.refresh(order)
+    return WalletResult(True, "Đã hoàn tiền đơn hàng vào ví người dùng.", tx, order)
+
+
 async def pay_product_with_wallet(
     session: AsyncSession,
     bot: Bot,
     user_id: int,
     product_id: int,
     quantity: int = 1,
+    voucher_code: str | None = None,
 ) -> WalletResult:
     user = await session.get(User, user_id, with_for_update=True)
     if not user:
@@ -482,6 +668,8 @@ async def pay_product_with_wallet(
     product = await session.get(Product, product_id)
     if not product or not product.is_active:
         return WalletResult(False, "Sản phẩm không tồn tại hoặc đã ngừng bán.")
+    if not payment_policy_service.is_payment_method_allowed(product, payment_policy_service.PAYMENT_METHOD_WALLET):
+        return WalletResult(False, "Sản phẩm này không hỗ trợ thanh toán bằng ví.")
 
     requested_quantity = max(1, int(quantity or 1))
     if product.delivery_mode == "fixed_content":
@@ -501,8 +689,8 @@ async def pay_product_with_wallet(
     delivered_lines = ""
     if product.delivery_mode == "fixed_content":
         if not (product.fixed_delivery_content or "").strip():
-            return WalletResult(False, "Sản phẩm này chưa được cấu hình nội dung giao cố định.")
-        delivered_lines = f"<code>{escape(product.fixed_delivery_content.strip())}</code>"
+            return WalletResult(False, "Sản phẩm này chưa được cấu hình nội dung giao cho khách.")
+        delivered_lines = escape(product.fixed_delivery_content.strip())
     else:
         stock_result = await session.execute(
             select(InventoryItem)
@@ -522,7 +710,26 @@ async def pay_product_with_wallet(
         )
 
     unit_price = money(product.price)
-    total_price = money(unit_price * requested_quantity)
+    original_total_price = money(unit_price * requested_quantity)
+    applied_voucher = None
+    discount_amount = money(0)
+    total_price = original_total_price
+    clean_voucher_code = (voucher_code or "").strip()
+    if clean_voucher_code:
+        voucher_validation = await voucher_service.validate_voucher(
+            session=session,
+            code=clean_voucher_code,
+            user_id=user_id,
+            product=product,
+            quantity=requested_quantity,
+            order_amount=original_total_price,
+        )
+        if not voucher_validation.ok or not voucher_validation.voucher:
+            return WalletResult(False, voucher_validation.message)
+        applied_voucher = voucher_validation.voucher
+        discount_amount = money(voucher_validation.discount_amount)
+        total_price = money(voucher_validation.final_amount)
+
     balance = money(user.wallet_balance)
     if balance < total_price:
         return WalletResult(False, f"Số dư ví không đủ. Cần thêm {format_vnd(total_price - balance)}.")
@@ -537,7 +744,10 @@ async def pay_product_with_wallet(
         status=WalletTxStatus.SUCCESS,
         reference=f"BUY{user_id}-{product_id}-{int(now.timestamp())}",
         provider="wallet",
-        note=f"Mua {requested_quantity} x sản phẩm #{product_id}",
+        note=(
+            f"Mua {requested_quantity} x sản phẩm #{product_id}"
+            + (f" | voucher {voucher_service.normalize_code(clean_voucher_code)} giảm {format_vnd(discount_amount)}" if discount_amount > 0 else "")
+        ),
         completed_at=now,
     )
     session.add(debit)
@@ -549,33 +759,52 @@ async def pay_product_with_wallet(
         total_amount=float(total_price),
         payment_method="wallet",
         commit=False,
+        original_amount=float(original_total_price),
+        discount_amount=float(discount_amount),
+        voucher_code=voucher_service.normalize_code(clean_voucher_code) if applied_voucher else None,
     )
-    order.status = OrderStatus.COMPLETED
-    order.paid_at = now
-    order.completed_at = now
-    for item in items:
-        item.is_sold = True
-        item.sold_at = now
-        item.order_id = order.id
+    paid_result = await order_payment_service.mark_order_paid(
+        session=session,
+        order=order,
+        payment_method=payment_policy_service.PAYMENT_METHOD_WALLET,
+        payment_note="Thanh toán thành công bằng ví",
+        paid_at=now,
+    )
+    if not paid_result.success:
+        await session.rollback()
+        return WalletResult(False, paid_result.message, debit, order)
+    if applied_voucher:
+        await voucher_service.mark_voucher_used(session, applied_voucher.id)
     await session.flush()
 
-    delivery_text = (
+    discount_lines = ""
+    if applied_voucher and discount_amount > 0:
+        discount_lines = (
+            f"Mã giảm giá: <b>{escape(order.voucher_code or applied_voucher.code)}</b>\n"
+            f"Giảm giá: <b>{format_vnd(discount_amount)}</b>\n"
+            f"Giá gốc: <b>{format_vnd(original_total_price)}</b>\n"
+        )
+
+    summary_text = (
         f"🎉 <b>Mua hàng thành công!</b>\n\n"
         f"Mã đơn hàng: <b>{escape(get_order_code(order))}</b>\n"
         f"Sản phẩm: <b>{escape(product.name)}</b>\n"
         f"Số lượng: <b>{requested_quantity}</b>\n"
-        f"Số tiền: <b>{format_vnd(total_price)}</b>\n"
+        f"{discount_lines}"
+        f"Số tiền thanh toán: <b>{format_vnd(total_price)}</b>\n"
         f"Số dư còn lại: <b>{format_vnd(user.wallet_balance)}</b>\n\n"
-        f"Thông tin sản phẩm bạn nhận được:\n{delivered_lines}\n\n"
-        "Cảm ơn bạn đã mua sắm tại shop!"
+        "Bot sẽ gửi thông tin sản phẩm cho bạn trong một tin nhắn riêng ngay sau đây."
     )
     try:
-        await bot.send_message(chat_id=user_id, text=delivery_text)
+        await bot.send_message(chat_id=user_id, text=summary_text)
+        complete_result = await order_payment_service.complete_paid_order(session, bot, order)
+        if not complete_result.success:
+            await session.rollback()
+            return WalletResult(False, complete_result.message, debit, order)
     except Exception:
         logger.exception("Failed to deliver wallet purchase", extra={"user_id": user_id, "product_id": product_id, "order_id": order.id if order else None})
         await session.rollback()
         return WalletResult(False, "Telegram gửi hàng thất bại. Ví chưa bị trừ tiền.", debit, order)
 
-    await session.commit()
     await session.refresh(order)
     return WalletResult(True, "Đã trừ ví và giao hàng thành công.", debit, order)

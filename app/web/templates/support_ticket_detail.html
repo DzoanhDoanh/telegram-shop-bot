@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Chi tiết ticket hỗ trợ{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-bold text-slate-100">Ticket #{{ ticket.id }}</h1>
+      <p class="mt-1 text-sm text-slate-400">User ID: <span class="font-mono">{{ ticket.user_id }}</span> · {{ ticket.user.full_name if ticket.user else 'Không rõ người dùng' }}</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/admin/users/{{ ticket.user_id }}" class="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition-colors hover:border-emerald-400/40 hover:bg-emerald-500/15">Mở hồ sơ user</a>
+      <a href="{{ back_url or '/admin/support' }}" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800">← Quay lại danh sách</a>
+    </div>
+  </div>
+
+  <div class="grid gap-4 md:grid-cols-3">
+    <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+      <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Trạng thái</div>
+      <div class="mt-2">
+        {% if ticket.status.value == 'open' %}
+        <span class="rounded-full bg-amber-500/10 px-3 py-1 text-sm font-bold text-amber-300">Đang mở</span>
+        {% elif ticket.status.value == 'admin_replied' %}
+        <span class="rounded-full bg-sky-500/10 px-3 py-1 text-sm font-bold text-sky-300">Đã phản hồi</span>
+        {% else %}
+        <span class="rounded-full bg-slate-500/10 px-3 py-1 text-sm font-bold text-slate-300">Đã đóng</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+      <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Tạo lúc</div>
+      <div class="mt-2 text-lg font-bold text-slate-100">{{ ticket.created_at.strftime('%d/%m/%Y %H:%M') if ticket.created_at else '' }}</div>
+    </div>
+    <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+      <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Cập nhật cuối</div>
+      <div class="mt-2 text-lg font-bold text-slate-100">{{ ticket.updated_at.strftime('%d/%m/%Y %H:%M') if ticket.updated_at else '' }}</div>
+    </div>
+  </div>
+
+  <div class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+    <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+      <h2 class="text-base font-bold text-slate-100">Hội thoại</h2>
+      <div class="mt-4 space-y-3">
+        {% for item in ticket.messages|sort(attribute='created_at') %}
+        <div class="rounded-xl border {% if item.sender_role == 'admin' %}border-sky-500/20 bg-sky-500/5{% else %}border-slate-800 bg-slate-950/50{% endif %} px-4 py-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="text-sm font-semibold {% if item.sender_role == 'admin' %}text-sky-300{% else %}text-slate-100{% endif %}">{% if item.sender_role == 'admin' %}Shop{% else %}Khách hàng{% endif %}</div>
+            <div class="text-xs text-slate-500">{{ item.created_at.strftime('%d/%m/%Y %H:%M') if item.created_at else '' }}</div>
+          </div>
+          <div class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">{{ item.content }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="space-y-6">
+      <form method="POST" action="/admin/support/{{ ticket.id }}/reply" class="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6" onsubmit="return confirmAction('Gửi phản hồi cho ticket #{{ ticket.id }}?', this, 'Đang gửi...');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div>
+          <h2 class="text-base font-bold text-slate-100">Phản hồi khách hàng</h2>
+          <p class="text-xs text-slate-400">Tin nhắn sẽ được gửi ngay vào bot của khách và lưu vào lịch sử ticket.</p>
+        </div>
+        <textarea name="content" rows="8" required class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none" placeholder="Nhập nội dung phản hồi..."></textarea>
+        <label class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm text-slate-300">
+          <input type="checkbox" name="close_after_reply" value="1" class="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500 focus:ring-emerald-500">
+          <span>Đóng ticket ngay sau khi gửi phản hồi này</span>
+        </label>
+        <button type="submit" class="w-full rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-900 transition-all hover:bg-emerald-600 active:scale-95">Gửi phản hồi</button>
+      </form>
+
+      {% if ticket.status.value != 'closed' %}
+      <form method="POST" action="/admin/support/{{ ticket.id }}/close" class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6" onsubmit="return confirmAction('Đóng ticket #{{ ticket.id }}?', this, 'Đang đóng...');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <h2 class="text-base font-bold text-slate-100">Đóng ticket</h2>
+        <p class="mt-1 text-xs text-slate-400">Dùng khi yêu cầu đã được xử lý xong.</p>
+        <button type="submit" class="mt-4 w-full rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-bold text-slate-200 transition-all hover:border-slate-600 hover:bg-slate-800">Đánh dấu đã xử lý</button>
+      </form>
+      {% else %}
+      <form method="POST" action="/admin/support/{{ ticket.id }}/reopen" class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6" onsubmit="return confirmAction('Mở lại ticket #{{ ticket.id }}?', this, 'Đang mở lại...');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <h2 class="text-base font-bold text-slate-100">Mở lại ticket</h2>
+        <p class="mt-1 text-xs text-slate-400">Dùng khi khách tiếp tục cần hỗ trợ hoặc cần xử lý thêm.</p>
+        <button type="submit" class="mt-4 w-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-bold text-amber-200 transition-all hover:border-amber-400/50 hover:bg-amber-500/15">Mở lại ticket</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Nhập kho — Admin{% endblock %}
-{% block page_title %}Nhập kho digital goods{% endblock %}
+{% block page_title %}Nhập kho sản phẩm số{% endblock %}
 
 {% block content %}
 <div class="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg shadow-slate-950/20">
@@ -18,11 +18,11 @@
 
 <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
     <div class="rounded-2xl border border-slate-800 bg-slate-900 p-7">
-        <h3 class="mb-1 text-base font-bold text-slate-100">Nạp danh sách digital goods</h3>
+        <h3 class="mb-1 text-base font-bold text-slate-100">Nạp danh sách sản phẩm số</h3>
         <p class="mb-5 text-sm text-slate-400">Chọn đúng sản phẩm, dán dữ liệu, kiểm tra số dòng hợp lệ rồi mới nạp. Mỗi dòng sẽ được giao cho đúng 1 đơn hàng.</p>
         {% if fixed_content_products %}
         <div class="mb-5 rounded-xl border border-sky-500/30 bg-sky-500/10 p-4 text-sm leading-6 text-sky-100">
-            <b>Lưu ý:</b> Có {{ fixed_content_products|length }} sản phẩm đang dùng <b>nội dung cố định</b> nên không xuất hiện trong danh sách nạp kho. Với các sản phẩm đó, hãy vào <b>Quản lý sản phẩm</b> để nhập nội dung ở ô <b>Nội dung giao cố định</b>.
+            <b>Lưu ý:</b> Có {{ fixed_content_products|length }} sản phẩm dùng <b>nội dung có sẵn</b> nên không xuất hiện trong danh sách nạp kho. Với các sản phẩm đó, hãy vào <b>Quản lý sản phẩm</b> để cập nhật phần <b>Nội dung giao cho khách</b>.
         </div>
         {% endif %}
 
@@ -41,7 +41,7 @@
             </div>
         </div>
 
-        <form method="POST" action="/admin/inventory/add" class="space-y-4" onsubmit="return confirmAction('Nạp danh sách digital goods này vào kho? Hãy kiểm tra trùng lặp trước khi tiếp tục.', this, 'Đang nạp...');">
+        <form method="POST" action="/admin/inventory/add" class="space-y-4" onsubmit="return confirmAction('Nạp danh sách sản phẩm số này vào kho? Hãy kiểm tra trùng lặp trước khi tiếp tục.', this, 'Đang nạp...');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div>
                 <label class="mb-1.5 block text-sm font-medium text-slate-300">Sản phẩm nhận hàng</label>
@@ -57,7 +57,7 @@
             </div>
             <div>
                 <label class="mb-1.5 block text-sm font-medium text-slate-300">
-                    Digital goods cần nhập
+                    Dữ liệu cần nhập
                     <span class="ml-1 text-xs text-slate-500">(mỗi dòng = 1 item giao cho 1 đơn)</span>
                 </label>
                 <textarea id="inventoryKeys" name="keys" rows="12" required
@@ -126,7 +126,10 @@ Google Drive: https://drive.google.com/... | Mã truy cập: 123456</pre>
         </div>
 
         <div class="rounded-2xl border border-slate-800 bg-slate-900 p-7">
-        <h3 class="mb-5 text-base font-bold text-slate-100">Tổng quan tồn kho</h3>
+        <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h3 class="text-base font-bold text-slate-100">Tổng quan tồn kho</h3>
+            <div class="text-xs text-slate-500">Trang <b>{{ current_page }}</b> / <b>{{ total_pages }}</b> · Tổng <b>{{ total_count }}</b> sản phẩm</div>
+        </div>
         <div class="space-y-3">
             {% for p in products %}
             <div class="flex items-center justify-between border-b border-slate-800 py-3 last:border-0">
@@ -156,6 +159,19 @@ Google Drive: https://drive.google.com/... | Mã truy cập: 123456</pre>
             </div>
             {% endfor %}
         </div>
+        {% if total_pages > 1 %}
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4 text-sm">
+            <div class="text-slate-500">Điều hướng trang</div>
+            <div class="flex flex-wrap gap-2">
+                {% if current_page > 1 %}
+                <a href="/admin/inventory?product_id={{ selected_product_id or '' }}&page={{ current_page - 1 }}" class="rounded-lg border border-slate-700 px-3 py-1.5 text-slate-300 hover:border-slate-600 hover:bg-slate-800">← Trang trước</a>
+                {% endif %}
+                {% if current_page < total_pages %}
+                <a href="/admin/inventory?product_id={{ selected_product_id or '' }}&page={{ current_page + 1 }}" class="rounded-lg border border-slate-700 px-3 py-1.5 text-slate-300 hover:border-slate-600 hover:bg-slate-800">Trang sau →</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
     </div>
 </div>

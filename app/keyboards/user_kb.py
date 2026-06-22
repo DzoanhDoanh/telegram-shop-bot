@@ -4,7 +4,6 @@ from aiogram.types import (
     KeyboardButton,
     ReplyKeyboardMarkup,
 )
-from app.config import settings
 
 BTN_SHOP = "🛍 Mua hàng"
 BTN_WALLET = "💰 Ví của tôi"
@@ -17,19 +16,16 @@ BTN_SHOW_MENU = "🙉 Hiện menu"
 BTN_HELP = "❓ Hướng dẫn"
 
 
-DEMO_SPIN_REWARDS = [
-    "1.000đ vào ví",
-    "2.000đ vào ví",
-    "5.000đ vào ví",
-    "Mã giảm giá 10%",
-    "Quà bí mật",
-    "Jackpot 50.000đ",
-    "Chúc bạn may mắn lần sau",
-    "Free ship tưởng tượng",
-]
+def get_persistent_menu_kb(show_terms_button: bool = True, show_help_button: bool = True) -> ReplyKeyboardMarkup:
+    third_row = [KeyboardButton(text=BTN_SUPPORT)]
+    if show_terms_button:
+        third_row.append(KeyboardButton(text=BTN_TERMS))
 
+    fourth_row = []
+    if show_help_button:
+        fourth_row.append(KeyboardButton(text=BTN_HELP))
+    fourth_row.append(KeyboardButton(text=BTN_HIDE_MENU))
 
-def get_persistent_menu_kb() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -40,14 +36,8 @@ def get_persistent_menu_kb() -> ReplyKeyboardMarkup:
                 KeyboardButton(text=BTN_SEARCH),
                 KeyboardButton(text=BTN_ORDERS),
             ],
-            [
-                KeyboardButton(text=BTN_SUPPORT),
-                KeyboardButton(text=BTN_TERMS),
-            ],
-            [
-                KeyboardButton(text=BTN_HELP),
-                KeyboardButton(text=BTN_HIDE_MENU),
-            ],
+            third_row,
+            fourth_row,
         ],
         resize_keyboard=True,
         is_persistent=True,
@@ -64,8 +54,8 @@ def get_show_menu_kb() -> ReplyKeyboardMarkup:
     )
 
 
-def get_main_menu_kb() -> InlineKeyboardMarkup:
-    support_username = (settings.SHOP_SUPPORT_USERNAME or "").strip().lstrip("@")
+def get_main_menu_kb(support_username: str = "") -> InlineKeyboardMarkup:
+    support_username = (support_username or "").strip().lstrip("@")
     inline_keyboard = [
         [
             InlineKeyboardButton(text="🛍 Xem sản phẩm", callback_data="shop_catalog"),
@@ -85,6 +75,6 @@ def get_main_menu_kb() -> InlineKeyboardMarkup:
 def get_lucky_spin_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🎯 Quay ngay", callback_data="lucky_spin_demo")],
+            [InlineKeyboardButton(text="🎯 Quay ngay", callback_data="lucky_spin_play")],
         ]
     )

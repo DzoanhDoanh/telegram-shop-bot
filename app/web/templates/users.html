@@ -9,11 +9,6 @@
     <p class="mt-1 text-sm text-slate-400">Tìm kiếm khách hàng, kiểm tra trạng thái tài khoản, cộng trừ ví và mở nhanh lịch sử liên quan.</p>
   </div>
 
-  {% if msg %}
-  <div id="toast" class="rounded-xl border border-emerald-600/40 bg-emerald-900/60 px-5 py-3 text-sm text-emerald-100">{{ msg }}</div>
-  <script>setTimeout(function(){ var t=document.getElementById('toast'); if(t) t.style.display='none'; }, 4000);</script>
-  {% endif %}
-
   <form method="GET" action="/admin/users" class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -21,16 +16,32 @@
         <p class="text-xs text-slate-400">Tìm theo user ID, username hoặc tên hiển thị.</p>
       </div>
       <div class="flex gap-2 flex-wrap">
-        <a href="/admin/users?q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if not current_status %}border-emerald-500 bg-emerald-500/10 text-emerald-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Tất cả</a>
-        <a href="/admin/users?status=active&q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'active' %}border-emerald-500 bg-emerald-500/10 text-emerald-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Đang hoạt động</a>
-        <a href="/admin/users?status=banned&q={{ current_query or '' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'banned' %}border-red-500 bg-red-500/10 text-red-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Đã bị cấm</a>
+        <a href="/admin/users?q={{ current_query or '' }}&segment={{ current_segment or 'all' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if not current_status %}border-emerald-500 bg-emerald-500/10 text-emerald-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Tất cả</a>
+        <a href="/admin/users?status=active&q={{ current_query or '' }}&segment={{ current_segment or 'all' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'active' %}border-emerald-500 bg-emerald-500/10 text-emerald-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Đang hoạt động</a>
+        <a href="/admin/users?status=banned&q={{ current_query or '' }}&segment={{ current_segment or 'all' }}" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all {% if current_status == 'banned' %}border-red-500 bg-red-500/10 text-red-300{% else %}border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200{% endif %}">Đã bị cấm</a>
       </div>
     </div>
 
-    <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_180px]">
-      <input type="text" name="q" value="{{ current_query or '' }}" placeholder="Ví dụ: 7623630839, username, tên người dùng..."
+    <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_240px_180px]">
+      <input type="text" name="q" value="{{ current_query or '' }}" placeholder="Ví dụ: 7623630839, username, tên người dùng, tag, ghi chú..."
              class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none">
+      <select name="segment" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 focus:border-emerald-500 focus:outline-none">
+        <option value="all" {% if current_segment == 'all' %}selected{% endif %}>Tất cả nhóm user</option>
+        <option value="repeat_buyers" {% if current_segment == 'repeat_buyers' %}selected{% endif %}>Đã mua hàng</option>
+        <option value="deposit_no_purchase" {% if current_segment == 'deposit_no_purchase' %}selected{% endif %}>Đã nạp nhưng chưa mua</option>
+        <option value="wallet_rich" {% if current_segment == 'wallet_rich' %}selected{% endif %}>Ví còn nhiều tiền</option>
+        <option value="new_no_deposit" {% if current_segment == 'new_no_deposit' %}selected{% endif %}>Mới vào chưa nạp</option>
+        <option value="vip" {% if current_segment == 'vip' %}selected{% endif %}>VIP chi tiêu cao</option>
+      </select>
       <button type="submit" class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-900 transition-all hover:bg-emerald-600 active:scale-95">Lọc người dùng</button>
+    </div>
+    <div class="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-6">
+      <div class="rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3"><div class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Tổng</div><div class="mt-1 text-lg font-bold text-slate-100">{{ segment_counts.all }}</div></div>
+      <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3"><div class="text-[11px] uppercase tracking-[0.18em] text-emerald-300">Đã mua</div><div class="mt-1 text-lg font-bold text-emerald-200">{{ segment_counts.repeat_buyers }}</div></div>
+      <div class="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3"><div class="text-[11px] uppercase tracking-[0.18em] text-amber-300">Đã nạp chưa mua</div><div class="mt-1 text-lg font-bold text-amber-200">{{ segment_counts.deposit_no_purchase }}</div></div>
+      <div class="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3"><div class="text-[11px] uppercase tracking-[0.18em] text-blue-300">Ví còn nhiều</div><div class="mt-1 text-lg font-bold text-blue-200">{{ segment_counts.wallet_rich }}</div></div>
+      <div class="rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/5 px-4 py-3"><div class="text-[11px] uppercase tracking-[0.18em] text-fuchsia-300">Mới chưa nạp</div><div class="mt-1 text-lg font-bold text-fuchsia-200">{{ segment_counts.new_no_deposit }}</div></div>
+      <div class="rounded-xl border border-sky-500/20 bg-sky-500/5 px-4 py-3"><div class="text-[11px] uppercase tracking-[0.18em] text-sky-300">VIP</div><div class="mt-1 text-lg font-bold text-sky-200">{{ segment_counts.vip }}</div></div>
     </div>
   </form>
 
@@ -49,6 +60,7 @@
             <th class="px-3 py-3">Số dư ví</th>
             <th class="px-3 py-3">Tổng chi</th>
             <th class="px-3 py-3">Ngày tham gia</th>
+            <th class="px-3 py-3">Tag</th>
             <th class="px-3 py-3">Trạng thái</th>
             <th class="px-3 py-3">Xem nhanh</th>
           </tr>
@@ -66,6 +78,7 @@
             <td class="px-3 py-3 font-semibold text-emerald-300">{{ "{:,.0f}".format(user.wallet_balance|float) }}đ</td>
             <td class="px-3 py-3 font-semibold text-slate-100">{{ "{:,.0f}".format(user.total_spent|float) }}đ</td>
             <td class="px-3 py-3 text-xs text-slate-400">{{ user.created_at.strftime('%d/%m/%Y %H:%M') if user.created_at else '' }}</td>
+            <td class="px-3 py-3">{% if user.crm_tag %}<span class="rounded-full bg-sky-500/10 px-2.5 py-1 text-xs font-medium text-sky-300">{{ user.crm_tag }}</span>{% else %}<span class="text-xs text-slate-600">—</span>{% endif %}</td>
             <td class="px-3 py-3">
               {% if user.is_banned %}
               <span class="rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-300">Đã bị cấm</span>

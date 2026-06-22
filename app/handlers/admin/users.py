@@ -9,6 +9,7 @@ from app.database.session import async_session
 from app.database.models import User
 from app.config import settings
 from app.web.audit import write_bot_admin_audit
+from app.services import support_service
 
 router = Router()
 
@@ -95,11 +96,21 @@ async def cmd_reply(message: types.Message, command: CommandObject = None):
         await message.answer("⚠️ Nội dung phản hồi không được để trống.")
         return
 
+    ticket_id = None
     async with async_session() as session:
         user = await session.get(User, target_id)
         if not user:
             await message.answer("❌ Người dùng không tồn tại trong hệ thống!")
             return
+        ticket = await support_service.get_open_ticket_for_user(session, target_id)
+        if ticket:
+            updated_ticket, _ = await support_service.add_admin_reply(
+                session,
+                ticket.id,
+                f"telegram_admin:{message.from_user.id}",
+                content,
+            )
+            ticket_id = updated_ticket.id if updated_ticket else None
 
     outgoing_text = (
         "💬 <b>Phản hồi từ shop</b>\n\n"
@@ -115,10 +126,12 @@ async def cmd_reply(message: types.Message, command: CommandObject = None):
         )
         return
 
-    write_bot_admin_audit(message.from_user.id, "telegram_admin_reply", target_id=target_id, content_preview=content[:200])
+    write_bot_admin_audit(message.from_user.id, "telegram_admin_reply", target_id=target_id, content_preview=content[:200], ticket_id=ticket_id)
+    ticket_line = f"🎫 Ticket: <code>#{ticket_id}</code>\n" if ticket_id else ""
     await message.answer(
         "✅ Đã gửi phản hồi hỗ trợ thành công.\n\n"
         f"👤 User ID: <code>{target_id}</code>\n"
+        f"{ticket_line}"
         f"📝 Nội dung: {html_decoration.quote(content)}"
     )
 

@@ -10,19 +10,18 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
       <p
         class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-400"
       >
-        Digital goods
+        Sản phẩm số
       </p>
       <h2 class="text-xl font-bold text-slate-100">
         Danh mục hàng bán qua bot
       </h2>
       <p class="max-w-3xl text-sm leading-6 text-slate-400">
-        Sản phẩm là digital goods khách mua trực tiếp qua bot. Mỗi sản phẩm cần
-        giá, danh mục và tồn kho rõ ràng để bot hiển thị đúng cho khách.
+        Mỗi sản phẩm được bán trực tiếp qua bot. Hãy giữ giá, danh mục và tồn kho rõ ràng để khách nhìn đúng thông tin và hệ thống vận hành ổn định.
       </p>
       <p class="text-sm text-slate-500">
         Hiện có
         <span class="font-semibold text-slate-200"
-          >{{ products | length }}</span
+          >{{ total_count }}</span
         >
         sản phẩm đang hoạt động.
       </p>
@@ -93,6 +92,11 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
   </div>
 </form>
 
+<div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+  <div class="text-xs text-slate-400">Hiển thị tối đa <b>{{ per_page }}</b> sản phẩm / trang, tổng <b>{{ total_count }}</b> sản phẩm.</div>
+  <div class="text-xs text-slate-500">Trang <b>{{ current_page }}</b> / <b>{{ total_pages }}</b></div>
+</div>
+
 <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
   {% if products %}
   <div class="overflow-x-auto">
@@ -136,11 +140,17 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
         <tr class="transition-colors duration-150 hover:bg-slate-800/30">
           <td class="px-6 py-4 font-mono text-slate-500">{{ p.id }}</td>
           <td class="px-4 py-4">
-            <div class="font-semibold text-slate-100">{{ p.name }}</div>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="font-semibold text-slate-100">{{ p.name }}</div>
+              {% if p.is_bundle %}<span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">Combo</span>{% endif %}
+            </div>
             {% if p.description %}
             <div class="mt-0.5 max-w-xs truncate text-xs text-slate-500">
               {{ p.description }}
             </div>
+            {% endif %}
+            {% if p.bundle_items_text %}
+            <div class="mt-1 max-w-xs truncate text-xs text-emerald-300/90">{{ p.bundle_items_text }}</div>
             {% endif %}
           </td>
           <td class="px-4 py-4 text-slate-300">{{ p.category.name }}</td>
@@ -203,7 +213,7 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
                 method="POST"
                 action="/admin/products/{{ p.id }}/disable"
                 data-product-name="{{ p.name }}"
-                onsubmit='if (!confirm("Xóa sản phẩm " + this.dataset.productName + " khỏi shop? Sản phẩm sẽ không còn hiển thị cho khách.")) return false; setLoading(this, "Đang xóa..."); return true;'
+                onsubmit='return confirmAction("Ẩn sản phẩm " + this.dataset.productName + " khỏi shop? Sản phẩm sẽ không còn hiển thị cho khách nữa.", this, "Đang ẩn...");'
               >
                 <input
                   type="hidden"
@@ -266,6 +276,20 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
   </div>
   {% endif %}
 </div>
+
+{% if total_pages > 1 %}
+<div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4 text-sm">
+  <div class="text-slate-500">Điều hướng trang</div>
+  <div class="flex flex-wrap gap-2">
+    {% if current_page > 1 %}
+    <a href="/admin/products?q={{ q }}&category_id={{ category_id or '' }}&page={{ current_page - 1 }}" class="rounded-lg border border-slate-700 px-3 py-1.5 text-slate-300 hover:border-slate-600 hover:bg-slate-800">← Trang trước</a>
+    {% endif %}
+    {% if current_page < total_pages %}
+    <a href="/admin/products?q={{ q }}&category_id={{ category_id or '' }}&page={{ current_page + 1 }}" class="rounded-lg border border-slate-700 px-3 py-1.5 text-slate-300 hover:border-slate-600 hover:bg-slate-800">Trang sau →</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
 {% for p in products %}
 <div
@@ -368,6 +392,18 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
         </select>
         <p class="mt-2 text-xs leading-5 text-slate-500">Loại theo kho dùng cho key, tài khoản, mã riêng. Loại nội dung có sẵn dùng cho link tải, hướng dẫn hoặc nội dung được gửi giống nhau cho mỗi khách mua.</p>
         <div class="mt-4">
+          <label class="mb-1.5 block text-sm font-medium text-slate-300">Phương thức thanh toán</label>
+          <select
+            name="payment_mode"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 transition-colors focus:border-emerald-500 focus:outline-none"
+          >
+            <option value="wallet_only" {% if p.payment_mode == 'wallet_only' %}selected{% endif %}>Chỉ thanh toán bằng ví</option>
+            <option value="direct_bank_only" {% if p.payment_mode == 'direct_bank_only' %}selected{% endif %}>Chỉ chuyển khoản trực tiếp</option>
+            <option value="wallet_or_direct_bank" {% if p.payment_mode == 'wallet_or_direct_bank' %}selected{% endif %}>Cho phép cả ví và chuyển khoản trực tiếp</option>
+          </select>
+          <p class="mt-2 text-xs leading-5 text-slate-500">Dùng để quyết định khách được trả bằng ví, chuyển khoản thẳng theo mã đơn, hoặc chọn một trong hai.</p>
+        </div>
+        <div class="mt-4">
           <label class="mb-1.5 block text-sm font-medium text-slate-300">Nội dung gửi cho khách <span class="text-xs text-slate-500">(chỉ dùng cho loại nội dung có sẵn)</span></label>
           <textarea
             name="fixed_delivery_content"
@@ -375,6 +411,28 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
             placeholder="Ví dụ: Link tải phần mềm, mã truy cập, hướng dẫn cài đặt..."
             class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
           >{{ p.fixed_delivery_content or '' }}</textarea>
+        </div>
+        <label class="mt-4 flex items-start gap-3">
+          <input
+            type="checkbox"
+            name="is_bundle"
+            value="true"
+            {% if p.is_bundle %}checked{% endif %}
+            class="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500 focus:ring-emerald-500"
+          />
+          <span>
+            <span class="block text-sm font-medium text-slate-200">Đánh dấu là combo/bundle</span>
+            <span class="mt-1 block text-xs leading-5 text-slate-500">Dùng cho gói nhiều quyền lợi/sản phẩm trong một offer để storefront gắn badge và mô tả rõ hơn.</span>
+          </span>
+        </label>
+        <div class="mt-4">
+          <label class="mb-1.5 block text-sm font-medium text-slate-300">Nội dung combo <span class="text-xs text-slate-500">(tùy chọn)</span></label>
+          <textarea
+            name="bundle_items_text"
+            rows="3"
+            placeholder="Ví dụ: gồm 3 tài khoản, 1 key bonus, quyền lợi ưu tiên hỗ trợ..."
+            class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+          >{{ p.bundle_items_text or '' }}</textarea>
         </div>
         <label class="mt-4 flex items-start gap-3">
           <input
@@ -574,11 +632,44 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
         </select>
         <p class="mt-2 text-xs leading-5 text-slate-500">Loại theo kho dùng cho key, tài khoản, mã riêng. Loại nội dung có sẵn dùng cho link tải, hướng dẫn hoặc nội dung được gửi giống nhau cho mỗi khách mua.</p>
         <div class="mt-4">
+          <label class="mb-1.5 block text-sm font-medium text-slate-300">Phương thức thanh toán</label>
+          <select
+            name="payment_mode"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 transition-colors focus:border-emerald-500 focus:outline-none"
+          >
+            <option value="wallet_only" selected>Chỉ thanh toán bằng ví</option>
+            <option value="direct_bank_only">Chỉ chuyển khoản trực tiếp</option>
+            <option value="wallet_or_direct_bank">Cho phép cả ví và chuyển khoản trực tiếp</option>
+          </select>
+          <p class="mt-2 text-xs leading-5 text-slate-500">Dùng để quyết định khách được trả bằng ví, chuyển khoản thẳng theo mã đơn, hoặc chọn một trong hai.</p>
+        </div>
+        <div class="mt-4">
           <label class="mb-1.5 block text-sm font-medium text-slate-300">Nội dung gửi cho khách <span class="text-xs text-slate-500">(chỉ dùng cho loại nội dung có sẵn)</span></label>
           <textarea
             name="fixed_delivery_content"
             rows="4"
             placeholder="Ví dụ: Link tải phần mềm, mã truy cập, hướng dẫn cài đặt..."
+            class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
+          ></textarea>
+        </div>
+        <label class="mt-4 flex items-start gap-3">
+          <input
+            type="checkbox"
+            name="is_bundle"
+            value="true"
+            class="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-500 focus:ring-emerald-500"
+          />
+          <span>
+            <span class="block text-sm font-medium text-slate-200">Đánh dấu là combo/bundle</span>
+            <span class="mt-1 block text-xs leading-5 text-slate-500">Dùng cho gói nhiều quyền lợi/sản phẩm trong một offer để storefront gắn badge và mô tả rõ hơn.</span>
+          </span>
+        </label>
+        <div class="mt-4">
+          <label class="mb-1.5 block text-sm font-medium text-slate-300">Nội dung combo <span class="text-xs text-slate-500">(tùy chọn)</span></label>
+          <textarea
+            name="bundle_items_text"
+            rows="3"
+            placeholder="Ví dụ: gồm 3 tài khoản, 1 key bonus, quyền lợi ưu tiên hỗ trợ..."
             class="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 placeholder-slate-600 transition-colors focus:border-emerald-500 focus:outline-none"
           ></textarea>
         </div>

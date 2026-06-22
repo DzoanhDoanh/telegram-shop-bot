@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full bg-slate-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }} — {{ app_config.shop_display_name }}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-full bg-slate-950 text-slate-100">
+    <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <header class="mb-8 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/30">
+            <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-400">{{ app_config.shop_display_name }}</p>
+                    <h1 class="mt-3 text-3xl font-extrabold text-slate-100">Sản phẩm đang bán</h1>
+                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-400">Public storefront cơ bản dùng chung dữ liệu với bot. Khách có thể xem danh mục, tìm sản phẩm và đọc chính sách trước khi mua trong Telegram.</p>
+                    {% if current_category %}
+                    <p class="mt-3 inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">Đang xem danh mục: {{ current_category.emoji or '📦' }} {{ current_category.name }}</p>
+                    {% endif %}
+                </div>
+                <nav class="flex flex-wrap gap-3">
+                    {% for item in nav_links %}
+                    <a href="{{ item.href }}" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800">{{ item.label }}</a>
+                    {% endfor %}
+                </nav>
+            </div>
+        </header>
+
+        <form method="GET" action="/store" class="mb-6 rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
+            <div class="flex flex-col gap-3 xl:flex-row xl:items-center">
+                <input type="text" name="q" value="{{ current_query or '' }}" placeholder="Tìm theo tên hoặc mô tả sản phẩm" class="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none">
+                <select name="category_id" class="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none xl:min-w-[220px]">
+                    <option value="">Tất cả danh mục</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" {% if selected_category_id == category.id %}selected{% endif %}>{{ category.emoji or '📦' }} {{ category.name }}</option>
+                    {% endfor %}
+                </select>
+                <select name="availability" class="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none xl:min-w-[180px]">
+                    <option value="" {% if not current_availability %}selected{% endif %}>Mọi trạng thái</option>
+                    <option value="in_stock" {% if current_availability == 'in_stock' %}selected{% endif %}>Chỉ hiện còn hàng</option>
+                </select>
+                <select name="sort" class="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none xl:min-w-[200px]">
+                    <option value="newest" {% if current_sort == 'newest' %}selected{% endif %}>Mới cập nhật</option>
+                    <option value="best_value" {% if current_sort == 'best_value' %}selected{% endif %}>Ưu tiên dễ mua</option>
+                    <option value="price_asc" {% if current_sort == 'price_asc' %}selected{% endif %}>Giá thấp đến cao</option>
+                    <option value="price_desc" {% if current_sort == 'price_desc' %}selected{% endif %}>Giá cao đến thấp</option>
+                    <option value="name_asc" {% if current_sort == 'name_asc' %}selected{% endif %}>Tên A-Z</option>
+                </select>
+                <button type="submit" class="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-900 transition hover:bg-emerald-600">Lọc sản phẩm</button>
+            </div>
+            <div class="mt-3 text-xs text-slate-500">Hiển thị tối đa <b>{{ per_page }}</b> sản phẩm / trang, tổng <b>{{ total_count }}</b> sản phẩm công khai.</div>
+        </form>
+
+        <section class="mb-6 grid gap-4 lg:grid-cols-3">
+            <div class="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
+                <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Mua hàng</div>
+                <div class="mt-2 text-sm leading-6 text-slate-300">Duyệt sản phẩm trên web, sau đó nhắn Telegram để shop chốt đơn và giao hàng tự động qua bot.</div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
+                <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Hỗ trợ</div>
+                <div class="mt-2 text-sm leading-6 text-slate-300">Chính sách hỗ trợ và hậu mãi được công khai tại trang riêng để khách dễ kiểm tra trước khi mua.</div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
+                <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Điều khoản</div>
+                <div class="mt-2 text-sm leading-6 text-slate-300">Nội dung public trên web đang dùng chung dữ liệu cấu hình trong admin, giảm lệch thông tin giữa bot và website.</div>
+            </div>
+        </section>
+
+        <section class="mb-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <div class="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
+                <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Mua nhanh theo 3 bước</div>
+                <div class="mt-3 grid gap-3 md:grid-cols-3">
+                    <div class="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                        <div class="text-sm font-bold text-slate-100">1. Chọn sản phẩm</div>
+                        <div class="mt-2 text-sm leading-6 text-slate-400">Lọc theo danh mục, giá và trạng thái để tìm món phù hợp.</div>
+                    </div>
+                    <div class="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                        <div class="text-sm font-bold text-slate-100">2. Kiểm tra policy</div>
+                        <div class="mt-2 text-sm leading-6 text-slate-400">Đọc điều khoản và hỗ trợ trước khi nhắn shop để giảm hiểu nhầm.</div>
+                    </div>
+                    <div class="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                        <div class="text-sm font-bold text-slate-100">3. Chốt qua Telegram</div>
+                        <div class="mt-2 text-sm leading-6 text-slate-400">Shop xử lý trên cùng nguồn dữ liệu với bot để giao hàng và hỗ trợ nhất quán.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-6">
+                <div class="text-xs uppercase tracking-[0.18em] text-emerald-300">Mua an tâm hơn</div>
+                <h2 class="mt-2 text-xl font-bold text-slate-100">Các điểm giúp khách yên tâm</h2>
+                <ul class="mt-4 space-y-3 text-sm leading-6 text-slate-300">
+                    <li>• Trang điều khoản và hỗ trợ công khai trước khi mua</li>
+                    <li>• Trạng thái còn hàng, giao tự động, chọn số lượng hiển thị rõ trên từng card</li>
+                    <li>• Catalog web dùng chung dữ liệu với bot và admin</li>
+                </ul>
+                <div class="mt-5 flex flex-wrap gap-3">
+                    <a href="/terms" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800">Xem điều khoản</a>
+                    <a href="/support-policy" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800">Xem hỗ trợ</a>
+                </div>
+            </div>
+        </section>
+
+        {% if products %}
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {% for product in products %}
+            <article class="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/60 shadow-xl shadow-slate-950/20 transition hover:-translate-y-0.5 hover:border-slate-700">
+                <div class="border-b border-slate-800 bg-slate-950/40 px-5 py-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <div class="truncate text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">{{ product.category.emoji or '📦' }} {{ product.category.name }}</div>
+                            <h2 class="mt-2 line-clamp-2 min-h-[56px] text-lg font-bold leading-7 text-slate-100">{{ product.name }}</h2>
+                        </div>
+                        <div class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold {% if product.is_available %}border border-emerald-500/20 bg-emerald-500/10 text-emerald-300{% else %}border border-amber-500/20 bg-amber-500/10 text-amber-300{% endif %}">{% if product.is_available %}Có thể mua{% else %}Tạm hết hàng{% endif %}</div>
+                    </div>
+                    {% if product.highlight_badges %}
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        {% for badge in product.highlight_badges %}
+                        <span class="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-slate-300">{{ badge }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="flex flex-1 flex-col p-5">
+                    <div class="text-2xl font-extrabold text-slate-50">{{ '{:,.0f}'.format(product.price|float) }}đ</div>
+                    <p class="mt-3 line-clamp-3 min-h-[72px] text-sm leading-6 text-slate-300">{{ product.description or 'Shop chưa cập nhật mô tả chi tiết cho sản phẩm này.' }}</p>
+                    <div class="mt-4 grid gap-2 rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-400">
+                        {% if product.is_bundle and product.bundle_items_text %}
+                        <div class="line-clamp-2">Combo gồm: <b class="text-slate-200">{{ product.bundle_items_text }}</b></div>
+                        {% endif %}
+                        {% if product.is_fixed_content %}
+                        <div>Nội dung giao có sẵn, giao tự động sau khi mua.</div>
+                        {% else %}
+                        <div>Tồn kho hiện tại: <b class="text-slate-200">{{ product.stock }}</b></div>
+                        {% endif %}
+                        <div>
+                            {% if product.allow_quantity_selection %}
+                            Cho phép chọn số lượng từ <b class="text-slate-200">{{ product.min_quantity }}</b> đến <b class="text-slate-200">{{ product.max_quantity }}</b>
+                            {% else %}
+                            Mỗi lần mua áp dụng 1 cấu hình số lượng cố định.
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="mt-auto flex flex-wrap gap-3 pt-5">
+                        <a href="/store/products/{{ product.id }}" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800">Xem chi tiết</a>
+                        {% if support_url %}
+                        <a href="{{ support_url }}" class="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-slate-900 hover:bg-emerald-600">Liên hệ mua hàng</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </section>
+        {% else %}
+        <section class="rounded-3xl border border-slate-800 bg-slate-900/60 p-10 text-center">
+            <h2 class="text-xl font-bold text-slate-100">Chưa có sản phẩm phù hợp</h2>
+            <p class="mt-3 text-sm text-slate-400">Hãy thử đổi từ khóa tìm kiếm hoặc chọn danh mục khác.</p>
+        </section>
+        {% endif %}
+
+        {% if total_pages > 1 %}
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-800 bg-slate-900/60 px-5 py-4 text-sm text-slate-300">
+            <div>Trang <b>{{ current_page }}</b> / <b>{{ total_pages }}</b></div>
+            <div class="flex gap-2">
+                {% if current_page > 1 %}
+                {% if current_category %}
+                <a href="/store/categories/{{ current_category.id }}?availability={{ current_availability or '' }}&sort={{ current_sort or 'newest' }}&page={{ current_page - 1 }}" class="rounded-xl border border-slate-700 px-4 py-2 hover:border-slate-600 hover:bg-slate-800">← Trước</a>
+                {% else %}
+                <a href="/store?q={{ current_query or '' }}&category_id={{ selected_category_id or '' }}&availability={{ current_availability or '' }}&sort={{ current_sort or 'newest' }}&page={{ current_page - 1 }}" class="rounded-xl border border-slate-700 px-4 py-2 hover:border-slate-600 hover:bg-slate-800">← Trước</a>
+                {% endif %}
+                {% endif %}
+                {% if current_page < total_pages %}
+                {% if current_category %}
+                <a href="/store/categories/{{ current_category.id }}?availability={{ current_availability or '' }}&sort={{ current_sort or 'newest' }}&page={{ current_page + 1 }}" class="rounded-xl border border-slate-700 px-4 py-2 hover:border-slate-600 hover:bg-slate-800">Sau →</a>
+                {% else %}
+                <a href="/store?q={{ current_query or '' }}&category_id={{ selected_category_id or '' }}&availability={{ current_availability or '' }}&sort={{ current_sort or 'newest' }}&page={{ current_page + 1 }}" class="rounded-xl border border-slate-700 px-4 py-2 hover:border-slate-600 hover:bg-slate-800">Sau →</a>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </main>
+</body>
+</html>

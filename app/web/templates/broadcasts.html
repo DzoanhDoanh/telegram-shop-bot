@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Broadcast & segmentation{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="rounded-2xl border border-slate-800 bg-slate-900/60 px-6 py-5">
+    <h1 class="text-xl font-bold text-slate-100">Broadcast & segmentation</h1>
+    <p class="mt-1 text-sm text-slate-400">Chọn nhóm user mục tiêu, soạn nội dung, preview danh sách nhận và có thể gửi thật theo từng đợt giới hạn để tránh bắn ồ ạt.</p>
+  </div>
+
+  <form method="POST" action="/admin/broadcasts/preview" class="space-y-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-6" onsubmit="return confirmAction('Cập nhật preview broadcast?', this, 'Đang tải preview...');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">Nhóm người nhận</label>
+        <select name="segment" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 focus:border-emerald-500 focus:outline-none">
+          <option value="all" {% if current_segment == 'all' %}selected{% endif %}>Tất cả user</option>
+          <option value="repeat_buyers" {% if current_segment == 'repeat_buyers' %}selected{% endif %}>Đã mua hàng</option>
+          <option value="deposit_no_purchase" {% if current_segment == 'deposit_no_purchase' %}selected{% endif %}>Đã nạp nhưng chưa mua</option>
+          <option value="wallet_rich" {% if current_segment == 'wallet_rich' %}selected{% endif %}>Ví còn nhiều tiền</option>
+          <option value="new_no_deposit" {% if current_segment == 'new_no_deposit' %}selected{% endif %}>Mới vào chưa nạp</option>
+          <option value="vip" {% if current_segment == 'vip' %}selected{% endif %}>VIP chi tiêu cao</option>
+        </select>
+        <div class="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+          <div class="text-[11px] uppercase tracking-[0.18em] text-emerald-300">Ước tính người nhận</div>
+          <div class="mt-1 text-2xl font-bold text-emerald-200">{{ recipient_count }}</div>
+        </div>
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-slate-300">Nội dung broadcast</label>
+        <textarea name="message" rows="8" placeholder="Soạn nội dung broadcast tại đây..." class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none">{{ draft_message or '' }}</textarea>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button type="submit" class="rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-bold text-slate-900 transition-all hover:bg-emerald-600 active:scale-95">Xem preview</button>
+          <span class="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-2.5 text-xs font-semibold text-sky-200">Preview trước, gửi thật theo đợt giới hạn</span>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <form method="POST" action="/admin/broadcasts/send" class="space-y-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6" onsubmit="return confirmAction('Gửi broadcast thật cho segment này?', this, 'Đang gửi broadcast...');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="segment" value="{{ current_segment or 'all' }}">
+    <input type="hidden" name="message" value="{{ draft_message or '' }}">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <h2 class="text-base font-bold text-slate-100">Gửi broadcast thật</h2>
+        <p class="mt-1 text-sm text-slate-400">Chỉ gửi cho tối đa một batch mỗi lần để giảm rủi ro vận hành. Có lưu lịch sử chiến dịch ở dưới.</p>
+      </div>
+      <div class="w-full lg:w-56">
+        <label class="mb-1 block text-sm font-medium text-slate-300">Giới hạn mỗi đợt</label>
+        <input type="number" name="send_limit" min="1" max="500" value="200" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-slate-100 focus:border-emerald-500 focus:outline-none">
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button type="submit" class="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-slate-950 transition-all hover:bg-amber-300 active:scale-95">Gửi broadcast thật</button>
+      <span class="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold text-amber-200">Không gửi toàn bộ một phát; gửi lặp theo từng đợt nếu cần.</span>
+    </div>
+  </form>
+
+  <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-base font-bold text-slate-100">Preview người nhận đầu tiên</h2>
+        <p class="text-xs text-slate-400">Hiển thị tối đa 20 user đầu tiên trong segment hiện tại để admin kiểm tra đúng tệp.</p>
+      </div>
+    </div>
+    <div class="mt-4 overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-800 text-xs uppercase text-slate-500">
+          <tr><th class="px-3 py-3">User</th><th class="px-3 py-3">Ví</th><th class="px-3 py-3">Tổng chi</th><th class="px-3 py-3">Tag</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {% for user in preview_users %}
+          <tr>
+            <td class="px-3 py-3"><div class="font-medium text-slate-100">{{ user.full_name or 'Chưa có tên' }}</div><div class="text-xs text-slate-500">{{ user.id }} · @{{ user.username or 'không có username' }}</div></td>
+            <td class="px-3 py-3 text-emerald-300 font-semibold">{{ '{:,.0f}'.format(user.wallet_balance|float) }}đ</td>
+            <td class="px-3 py-3 text-slate-200 font-semibold">{{ '{:,.0f}'.format(user.total_spent|float) }}đ</td>
+            <td class="px-3 py-3">{% if user.crm_tag %}<span class="rounded-full bg-sky-500/10 px-2.5 py-1 text-xs font-medium text-sky-300">{{ user.crm_tag }}</span>{% else %}<span class="text-xs text-slate-600">—</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+          {% if not preview_users %}<tr><td colspan="4" class="px-3 py-8 text-center text-slate-500">Không có user phù hợp với segment hiện tại.</td></tr>{% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-base font-bold text-slate-100">Lịch sử chiến dịch gần đây</h2>
+        <p class="text-xs text-slate-400">Theo dõi nhanh các đợt gửi broadcast gần nhất, gồm số lượng gửi thành công và lỗi.</p>
+      </div>
+    </div>
+    <div class="mt-4 overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-800 text-xs uppercase text-slate-500">
+          <tr><th class="px-3 py-3">#</th><th class="px-3 py-3">Segment</th><th class="px-3 py-3">Kết quả</th><th class="px-3 py-3">Trạng thái</th><th class="px-3 py-3">Người gửi</th><th class="px-3 py-3">Thời gian</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {% for campaign in recent_campaigns %}
+          <tr>
+            <td class="px-3 py-3 font-semibold text-slate-100">#{{ campaign.id }}</td>
+            <td class="px-3 py-3 text-slate-300">{{ campaign.segment }}</td>
+            <td class="px-3 py-3 text-slate-200">{{ campaign.sent_count }}/{{ campaign.recipient_count }} thành công · lỗi {{ campaign.failed_count }}</td>
+            <td class="px-3 py-3">
+              <span class="rounded-full px-2.5 py-1 text-xs font-semibold {% if campaign.status.value == 'sent' %}bg-emerald-500/10 text-emerald-300{% elif campaign.status.value == 'partial' %}bg-amber-500/10 text-amber-300{% elif campaign.status.value == 'failed' %}bg-rose-500/10 text-rose-300{% else %}bg-slate-700 text-slate-200{% endif %}">{{ campaign.status.value }}</span>
+            </td>
+            <td class="px-3 py-3 text-slate-400">{{ campaign.admin_actor or 'admin' }}</td>
+            <td class="px-3 py-3 text-slate-400">{{ campaign.sent_at or campaign.created_at }}</td>
+          </tr>
+          {% endfor %}
+          {% if not recent_campaigns %}<tr><td colspan="6" class="px-3 py-8 text-center text-slate-500">Chưa có chiến dịch broadcast nào được gửi.</td></tr>{% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

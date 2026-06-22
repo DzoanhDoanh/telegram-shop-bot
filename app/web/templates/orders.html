@@ -22,12 +22,12 @@
             </div>
             <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
                 <div class="text-xs font-bold uppercase tracking-wider text-slate-500">Bước 3</div>
-                <div class="mt-1 font-semibold">Hệ thống gửi digital goods tự động</div>
+                <div class="mt-1 font-semibold">Hệ thống giao sản phẩm tự động</div>
             </div>
         </div>
     </div>
     <div class="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-200">
-        Cảnh báo: duyệt đơn sẽ giao stock cho khách hàng.
+        Cảnh báo: khi duyệt đơn, hệ thống sẽ giao sản phẩm cho khách ngay lập tức.
     </div>
 </div>
 
@@ -40,6 +40,7 @@
            class="shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 border
                   {% if current_status == val %}bg-emerald-500/10 text-emerald-400 border-emerald-500/20{% else %}text-slate-400 border-transparent hover:bg-slate-800/50 hover:text-slate-100{% endif %}">
             {{ label }}
+            <span class="ml-1 text-xs {% if current_status == val %}text-emerald-300{% else %}text-slate-500{% endif %}">({{ summary_counts[val] }})</span>
         </a>
         {% endfor %}
     </div>
@@ -89,6 +90,11 @@
     </div>
 </form>
 
+<div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div class="text-xs text-slate-400">Hiển thị tối đa <b>{{ per_page }}</b> đơn / trang, tổng <b>{{ total_count }}</b> đơn.</div>
+    <div class="text-xs text-slate-500">Trang <b>{{ current_page }}</b> / <b>{{ total_pages }}</b></div>
+</div>
+
 <!-- Orders Table -->
 <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
     {% if orders %}
@@ -111,25 +117,43 @@
                     <td class="px-6 py-4 font-bold text-slate-100">{{ order.display_code }}</td>
                     <td class="px-4 py-4">
                         <div class="font-medium text-slate-100">{{ order.product.name }}</div>
-                        <div class="text-xs text-slate-500">{{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                        <div class="text-xs text-slate-500">{{ order.created_at.strftime('%d/%m/%Y %H:%M') }} · SL {{ order.quantity }}</div>
+                        <div class="mt-1 text-[11px] text-sky-300">{{ order.payment_method_label }}</div>
+                        {% if order.bank_transfer_reference_normalized %}
+                        <div class="text-[11px] font-mono text-slate-500">Ref: {{ order.bank_transfer_reference_normalized }}</div>
+                        {% endif %}
                     </td>
                     <td class="px-4 py-4">
-                        <div class="font-medium text-slate-300">{{ order.user.full_name or 'N/A' }}</div>
-                        <div class="text-xs text-slate-500">ID: {{ order.user_id }}</div>
+                        <a href="/admin/users/{{ order.user_id }}" class="block rounded-lg transition-colors hover:bg-slate-800/30 -mx-2 px-2 py-1">
+                            <div class="font-medium text-slate-300 hover:text-emerald-300">{{ order.user.full_name or 'N/A' }}</div>
+                            <div class="text-xs text-slate-500">ID: {{ order.user_id }}</div>
+                        </a>
                     </td>
-                    <td class="px-4 py-4 text-right font-bold text-emerald-400">{{ "{:,.0f}".format(order.total_amount) }}đ</td>
+                    <td class="px-4 py-4 text-right">
+                        <div class="font-bold text-emerald-400">{{ "{:,.0f}".format(order.total_amount) }}đ</div>
+                        {% if order.voucher_code and (order.discount_amount or 0) > 0 %}
+                        <div class="mt-1 text-[11px] text-slate-500">Gốc {{ "{:,.0f}".format(order.original_amount or order.total_amount) }}đ</div>
+                        <div class="text-[11px] text-amber-300">{{ order.voucher_code }} · -{{ "{:,.0f}".format(order.discount_amount) }}đ</div>
+                        {% endif %}
+                    </td>
                     <td class="px-4 py-4 text-center">
                         <span class="text-xs font-bold px-3 py-1 rounded-full 
                             {% if order.status.value == 'completed' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
                             {% elif order.status.value == 'pending_payment' %}bg-amber-500/10 text-amber-400 border border-amber-500/20
+                            {% elif order.status.value == 'refunded' %}bg-sky-500/10 text-sky-300 border border-sky-500/20
                             {% else %}bg-slate-700/50 text-slate-400 border border-slate-700{% endif %}">
                             {% if order.status.value == 'completed' %}Hoàn thành
                             {% elif order.status.value == 'pending_payment' %}Chờ duyệt
+                            {% elif order.status.value == 'refunded' %}Đã hoàn tiền
                             {% else %}Đã hủy{% endif %}
                         </span>
                     </td>
                     <td class="px-4 py-4 text-center">
-                        {% if order.payment_proof %}
+                        {% if order.payment_method == 'direct_bank' %}
+                        <span class="inline-flex items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs font-bold text-sky-300">
+                            Webhook tự đối soát
+                        </span>
+                        {% elif order.payment_proof %}
                         <button type="button"
                                 onclick="openBillModal('billModal-{{ order.id }}')"
                                 class="inline-flex items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-400 transition-colors duration-150 hover:bg-emerald-500/20 hover:text-emerald-300">
@@ -176,6 +200,17 @@
                                 </button>
                             </form>
                         </div>
+                        {% elif order.status.value == 'completed' %}
+                        <form method="POST" action="/admin/orders/{{ order.id }}/refund" class="inline-flex flex-col items-stretch gap-2 sm:flex-row sm:items-center"
+                              onsubmit="return confirmAction('Hoàn tiền đơn {{ order.display_code }} vào ví người dùng?', this, 'Đang hoàn tiền...');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="text" name="reason" placeholder="Lý do hoàn tiền" required
+                                   class="w-full min-w-28 rounded-xl bg-slate-950 border border-slate-800 px-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 sm:w-36">
+                            <button type="submit"
+                                class="px-3 py-1.5 bg-sky-500/10 border border-sky-500/30 text-sky-300 text-xs font-bold rounded-xl hover:bg-sky-500/20 transition-colors duration-150">
+                                Hoàn tiền
+                            </button>
+                        </form>
                         {% else %}
                         <span class="text-xs text-slate-600">—</span>
                         {% endif %}
@@ -197,6 +232,20 @@
     </div>
     {% endif %}
 </div>
+
+{% if total_pages > 1 %}
+<div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4 text-sm">
+    <div class="text-slate-500">Điều hướng trang</div>
+    <div class="flex flex-wrap gap-2">
+        {% if current_page > 1 %}
+        <a href="/admin/orders?status={{ current_status }}&q={{ q }}&product_id={{ product_id or '' }}&date_from={{ date_from }}&date_to={{ date_to }}&page={{ current_page - 1 }}" class="rounded-lg border border-slate-700 px-3 py-1.5 text-slate-300 hover:border-slate-600 hover:bg-slate-800">← Trang trước</a>
+        {% endif %}
+        {% if current_page < total_pages %}
+        <a href="/admin/orders?status={{ current_status }}&q={{ q }}&product_id={{ product_id or '' }}&date_from={{ date_from }}&date_to={{ date_to }}&page={{ current_page + 1 }}" class="rounded-lg border border-slate-700 px-3 py-1.5 text-slate-300 hover:border-slate-600 hover:bg-slate-800">Trang sau →</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 
 <script>
 function openBillModal(modalId) {

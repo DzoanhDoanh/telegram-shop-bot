@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Digital Shop Admin{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
     <!-- Google Fonts Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -101,7 +102,7 @@
                     class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
                     >📊</span
                   >
-                  <span>Dashboard</span>
+                  <span>Tổng quan</span>
                 </a>
               </div>
 
@@ -120,7 +121,7 @@
                       class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
                       >📝</span
                     >
-                    <span>Đơn Hàng</span>
+                    <span>Đơn hàng</span>
                   </a>
                   <a
                     href="/admin/products"
@@ -130,7 +131,7 @@
                       class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
                       >📦</span
                     >
-                    <span>Sản Phẩm</span>
+                    <span>Sản phẩm</span>
                   </a>
                   <a
                     href="/admin/categories"
@@ -140,7 +141,7 @@
                       class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
                       >🏷️</span
                     >
-                    <span>Danh Mục</span>
+                    <span>Danh mục</span>
                   </a>
                   <a
                     href="/admin/inventory"
@@ -150,7 +151,7 @@
                       class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
                       >📥</span
                     >
-                    <span>Nhập Kho</span>
+                    <span>Nhập kho</span>
                   </a>
                   <a
                     href="/admin/payments"
@@ -160,7 +161,7 @@
                       class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
                       >💳</span
                     >
-                    <span>Thanh Toán</span>
+                    <span>Thanh toán</span>
                   </a>
                   <a
                     href="/admin/users"
@@ -170,7 +171,47 @@
                       class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
                       >👤</span
                     >
-                    <span>Người Dùng</span>
+                    <span>Người dùng</span>
+                  </a>
+                  <a
+                    href="/admin/support"
+                    class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 {% if active_page == 'support' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-lg shadow-emerald-950/20{% else %}border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50{% endif %}"
+                  >
+                    <span
+                      class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
+                      >💬</span
+                    >
+                    <span>Hỗ trợ</span>
+                  </a>
+                  <a
+                    href="/admin/vouchers"
+                    class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 {% if active_page == 'vouchers' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-lg shadow-emerald-950/20{% else %}border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50{% endif %}"
+                  >
+                    <span
+                      class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
+                      >🎟️</span
+                    >
+                    <span>Voucher</span>
+                  </a>
+                  <a
+                    href="/admin/broadcasts"
+                    class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 {% if active_page == 'broadcasts' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-lg shadow-emerald-950/20{% else %}border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50{% endif %}"
+                  >
+                    <span
+                      class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
+                      >📣</span
+                    >
+                    <span>Broadcast</span>
+                  </a>
+                  <a
+                    href="/admin/settings"
+                    class="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 {% if active_page == 'settings' %}border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-lg shadow-emerald-950/20{% else %}border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-50{% endif %}"
+                  >
+                    <span
+                      class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-base"
+                      >⚙️</span
+                    >
+                    <span>Cấu hình bot/shop</span>
                   </a>
                 </div>
               </div>
@@ -192,7 +233,7 @@
                       class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-sm"
                       >📄</span
                     >
-                    <span>Đơn Hàng CSV</span>
+                    <span>Đơn hàng CSV</span>
                   </a>
                   <a
                     href="/admin/export/products.csv"
@@ -202,7 +243,7 @@
                       class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-sm"
                       >📄</span
                     >
-                    <span>Sản Phẩm CSV</span>
+                    <span>Sản phẩm CSV</span>
                   </a>
                   <a
                     href="/admin/export/inventory.csv"
@@ -212,7 +253,7 @@
                       class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-sm"
                       >📄</span
                     >
-                    <span>Tồn Kho CSV</span>
+                    <span>Tồn kho CSV</span>
                   </a>
                 </div>
               </div>
@@ -227,7 +268,7 @@
             class="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-950/30 px-4 py-3 text-sm font-semibold text-slate-300 transition-all duration-200 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300"
           >
             <span>🚪</span>
-            <span>Đăng Xuất</span>
+            <span>Đăng xuất</span>
           </a>
         </div>
       </aside>
@@ -254,7 +295,7 @@
                   {% block page_title %}{% endblock %}
                 </h1>
                 <p class="mt-0.5 text-xs font-medium text-slate-400">
-                  Web Admin Panel
+                  Trang quản trị hệ thống
                 </p>
               </div>
             </div>
@@ -284,7 +325,8 @@
     </div>
 
     {% if msg %} {% set msg_lower = msg|lower %} {% set is_error = 'lỗi' in
-    msg_lower or 'không' in msg_lower or 'thất bại' in msg_lower or 'sai' in
+    msg_lower or 'thất bại' in msg_lower or 'không thể' in msg_lower or 'không tìm thấy' in
+    msg_lower or 'không tải được' in msg_lower or 'không hợp lệ' in msg_lower or 'sai' in
     msg_lower %}
     <div
       id="toast"
@@ -340,10 +382,42 @@
       }
 
       function confirmAction(message, form, loadingLabel) {
-        if (!confirm(message)) return false;
+        if (!message || !form) {
+          return true;
+        }
 
-        setLoading(form, loadingLabel || "Đang xử lý...");
-        return true;
+        const existing = document.getElementById("confirmActionModal");
+        if (existing) existing.remove();
+
+        const overlay = document.createElement("div");
+        overlay.id = "confirmActionModal";
+        overlay.className = "fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm";
+        overlay.innerHTML = `
+          <div class="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl shadow-slate-950/60">
+            <div class="border-b border-slate-800 px-5 py-4">
+              <h3 class="text-base font-bold text-slate-100">Xác nhận thao tác</h3>
+              <p class="mt-1 text-sm leading-6 text-slate-400">${message}</p>
+            </div>
+            <div class="flex items-center justify-end gap-3 px-5 py-4">
+              <button type="button" data-role="cancel" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:border-slate-600 hover:bg-slate-800 hover:text-slate-100">Hủy</button>
+              <button type="button" data-role="confirm" class="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-slate-900 transition-all hover:bg-emerald-600 active:scale-95">Xác nhận</button>
+            </div>
+          </div>
+        `;
+
+        const closeModal = () => overlay.remove();
+        overlay.addEventListener("click", (event) => {
+          if (event.target === overlay) closeModal();
+        });
+        overlay.querySelector('[data-role="cancel"]').addEventListener("click", closeModal);
+        overlay.querySelector('[data-role="confirm"]').addEventListener("click", () => {
+          setLoading(form, loadingLabel || "Đang xử lý...");
+          closeModal();
+          form.submit();
+        });
+
+        document.body.appendChild(overlay);
+        return false;
       }
 
       window.addEventListener("resize", () => {

@@ -10,7 +10,7 @@ from app.config import settings
 from app.database.models import User
 from app.database.session import async_session
 from app.keyboards.user_kb import BTN_SEARCH, get_persistent_menu_kb
-from app.services import product_service
+from app.services import app_config_service, product_service
 
 router = Router()
 
@@ -25,8 +25,13 @@ CATALOG_TEXT = (
 )
 
 
-def _support_url() -> str | None:
-    support_username = (settings.SHOP_SUPPORT_USERNAME or "").strip().lstrip("@")
+async def _catalog_app_config():
+    async with async_session() as session:
+        return await app_config_service.get_app_config_view(session)
+
+
+def _support_url(support_username: str = "") -> str | None:
+    support_username = (support_username or "").strip().lstrip("@")
     if not support_username:
         return None
     return f"https://t.me/{support_username}"
@@ -36,9 +41,10 @@ async def _ensure_callback_user_allowed(callback: types.CallbackQuery) -> bool:
     async with async_session() as session:
         user = await session.get(User, callback.from_user.id)
         if user and user.is_banned:
+            app_config = await app_config_service.get_app_config_view(session)
             await callback.message.answer(
                 "🚫 Tài khoản của bạn đã bị cấm sử dụng bot.",
-                reply_markup=get_persistent_menu_kb(),
+                reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
             )
             await callback.answer()
             return False
@@ -58,8 +64,8 @@ def _build_category_keyboard(categories) -> InlineKeyboardMarkup:
     return keyboard
 
 
-def _build_support_button() -> InlineKeyboardButton | None:
-    support_url = _support_url()
+def _build_support_button(support_username: str = "") -> InlineKeyboardButton | None:
+    support_url = _support_url(support_username)
     if not support_url:
         return None
     return InlineKeyboardButton(text="💬 Hỗ trợ", url=support_url)
@@ -67,36 +73,47 @@ def _build_support_button() -> InlineKeyboardButton | None:
 
 def _product_button_text(product, stock: int | None = None) -> str:
     text = f"{product.name} - {product.price:,.0f}đ"
-    if getattr(product, "delivery_mode", "inventory") != "fixed_content" and stock is not None:
-        text += f" | SL: {stock}"
+    if getattr(product, "delivery_mode", "inventory") == "fixed_content":
+        text += " | Giao tự động"
+    elif stock is not None:
+        text += f" | Còn {stock}"
     return text
 
 
 def _product_detail_text(product, stock: int) -> str:
     safe_name = html.escape(product.name or "Sản phẩm")
     safe_description = html.escape(product.description or "")
+    is_fixed_content = getattr(product, "delivery_mode", "inventory") == "fixed_content"
     stock_status = (
-        f"✅ Còn hàng: <b>{stock}</b> sản phẩm sẵn sàng giao"
+        f"✅ Còn sẵn: <b>{stock}</b> đơn vị có thể giao ngay"
         if stock > 0
-        else "⛔ Tạm hết hàng: vui lòng liên hệ hỗ trợ hoặc quay lại sau"
+        else "⛔ Tạm hết hàng, vui lòng quay lại sau hoặc liên hệ hỗ trợ"
     )
-    quantity_note = "1 sản phẩm / lượt mua"
-    if getattr(product, "delivery_mode", "inventory") == "fixed_content":
-        quantity_note = "1 sản phẩm / lượt mua"
+
+    if is_fixed_content:
+        quantity_note = "Mỗi lần mua nhận 1 nội dung cố định, không cần chọn số lượng"
+        delivery_note = "📩 Sau khi thanh toán, bot sẽ gửi ngay nội dung/link đã cấu hình cho sản phẩm này"
     elif getattr(product, "allow_quantity_selection", False):
-        quantity_note = f"Cho chọn số lượng từ {int(product.min_quantity or 1)} đến {int(product.max_quantity or 1)}"
+        min_quantity = int(product.min_quantity or 1)
+        max_quantity = min(stock, max(int(product.max_quantity or 1), min_quantity))
+        quantity_note = f"Được chọn từ {min_quantity} đến {max_quantity}"
+        delivery_note = "📩 Sau khi thanh toán, bot sẽ giao đúng số lượng bạn đã chọn"
+    else:
+        quantity_note = "Sản phẩm này chỉ bán cố định 1 đơn vị mỗi lần mua"
+        delivery_note = "📩 Sau khi thanh toán, bot sẽ giao tự động 1 đơn vị sản phẩm"
 
     text = f"📦 <b>{safe_name}</b>\n\n"
     if safe_description:
-        text += f"📝 {safe_description}\n\n"
-    text += f"💰 Giá: <b>{product.price:,.0f}đ</b> / 1 sản phẩm\n"
+        text += f"📝 Mô tả: {safe_description}\n\n"
+    text += f"💰 Đơn giá: <b>{product.price:,.0f}đ</b>\n"
     text += f"🔢 Số lượng mua: <b>{html.escape(quantity_note)}</b>\n"
-    if getattr(product, "delivery_mode", "inventory") != "fixed_content":
+    if not is_fixed_content:
         text += f"📊 {stock_status}\n"
+    text += f"{delivery_note}\n"
     return text
 
 
-def _build_product_detail_keyboard(product, stock: int) -> InlineKeyboardMarkup:
+def _build_product_detail_keyboard(product, stock: int, support_username: str = "") -> InlineKeyboardMarkup:
     buttons = []
     can_buy = stock > 0 or getattr(product, "delivery_mode", "inventory") == "fixed_content"
     if can_buy:
@@ -106,7 +123,7 @@ def _build_product_detail_keyboard(product, stock: int) -> InlineKeyboardMarkup:
 
     buttons.append([InlineKeyboardButton(text="🔄 Làm mới", callback_data=f"refresh_prod_{product.id}")])
 
-    support_button = _build_support_button()
+    support_button = _build_support_button(support_username)
     if support_button:
         buttons.append([support_button])
 
@@ -138,20 +155,30 @@ def _build_search_results_keyboard(products, stock_counts: dict[int, int] | None
 
 async def _send_search_prompt(message: types.Message, state: FSMContext) -> None:
     await state.set_state(SearchState.waiting_for_query)
+    app_config = await _catalog_app_config()
     await message.answer(
         "🔎 <b>Tìm kiếm sản phẩm</b>\n\n"
         "Nhập tên hoặc từ khóa sản phẩm bạn muốn tìm.\n"
         "Ví dụ: <code>netflix</code>, <code>game</code>, <code>drive</code>",
-        reply_markup=get_persistent_menu_kb(),
+        reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
     )
 
 
 async def send_catalog(message: types.Message) -> None:
     categories = await _get_categories()
+    app_config = await _catalog_app_config()
+
+    if app_config.maintenance_mode and message.from_user.id not in settings.ADMIN_IDS:
+        await message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau hoặc nhắn hỗ trợ nếu bạn cần kiểm tra đơn đang dở.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        return
 
     if not categories:
         await message.answer(
-            "🛍 Shop đang cập nhật danh mục sản phẩm. Vui lòng quay lại sau hoặc bấm 💬 Hỗ trợ để được tư vấn nhanh."
+            "🛍 Shop đang cập nhật danh mục sản phẩm. Vui lòng quay lại sau hoặc bấm 💬 Hỗ trợ để được tư vấn nhanh.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
         )
         return
 
@@ -166,11 +193,19 @@ async def cmd_search(message: types.Message, state: FSMContext):
 
 @router.callback_query(F.data == "product_search")
 async def product_search(callback: types.CallbackQuery, state: FSMContext):
+    app_config = await _catalog_app_config()
+    if app_config.maintenance_mode and callback.from_user.id not in settings.ADMIN_IDS:
+        await callback.message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        await callback.answer()
+        return
     await state.set_state(SearchState.waiting_for_query)
     await callback.message.answer(
         "🔎 <b>Tìm kiếm sản phẩm</b>\n\n"
         "Nhập tên hoặc từ khóa sản phẩm bạn muốn tìm.",
-        reply_markup=get_persistent_menu_kb(),
+        reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
     )
     await callback.answer()
 
@@ -208,11 +243,21 @@ async def process_product_search(message: types.Message, state: FSMContext):
 async def show_categories(callback: types.CallbackQuery):
     if not await _ensure_callback_user_allowed(callback):
         return
+    app_config = await _catalog_app_config()
+    if app_config.maintenance_mode and callback.from_user.id not in settings.ADMIN_IDS:
+        await callback.message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau hoặc nhắn hỗ trợ nếu bạn cần kiểm tra đơn đang dở.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        await callback.answer()
+        return
+
     categories = await _get_categories()
 
     if not categories:
         await callback.message.answer(
-            "🛍 Shop đang cập nhật danh mục sản phẩm. Vui lòng quay lại sau hoặc bấm 💬 Hỗ trợ để được tư vấn nhanh."
+            "🛍 Shop đang cập nhật danh mục sản phẩm. Vui lòng quay lại sau hoặc bấm 💬 Hỗ trợ để được tư vấn nhanh.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
         )
         await callback.answer()
         return
@@ -233,9 +278,11 @@ async def show_products(callback: types.CallbackQuery):
         products = await product_service.get_products_by_category(session, cat_id)
         stock_counts = await product_service.get_stock_counts(session, [product.id for product in products])
 
+    app_config = await _catalog_app_config()
     if not products:
         await callback.message.answer(
-            "Danh mục này tạm thời chưa có sản phẩm. Shop sẽ bổ sung sớm, bạn có thể chọn danh mục khác hoặc liên hệ hỗ trợ."
+            "Danh mục này tạm thời chưa có sản phẩm. Shop sẽ bổ sung sớm, bạn có thể chọn danh mục khác hoặc liên hệ hỗ trợ.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
         )
         await callback.answer()
         return
@@ -267,16 +314,18 @@ async def show_product_detail(callback: types.CallbackQuery):
         product = await product_service.get_product(session, prod_id)
         stock = await product_service.get_stock_count(session, prod_id)
 
+    app_config = await _catalog_app_config()
     if not product or not product.is_active:
         await callback.message.answer(
-            "Sản phẩm này hiện không còn khả dụng. Vui lòng chọn sản phẩm khác hoặc liên hệ hỗ trợ nếu cần tư vấn."
+            "Sản phẩm này hiện không còn khả dụng. Vui lòng chọn sản phẩm khác hoặc liên hệ hỗ trợ nếu cần tư vấn.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
         )
         await callback.answer()
         return
 
     await callback.message.edit_text(
         _product_detail_text(product, stock),
-        reply_markup=_build_product_detail_keyboard(product, stock),
+        reply_markup=_build_product_detail_keyboard(product, stock, app_config.support_username),
     )
     await callback.answer()
 
@@ -290,6 +339,7 @@ async def refresh_product_detail(callback: types.CallbackQuery):
         product = await product_service.get_product(session, prod_id)
         stock = await product_service.get_stock_count(session, prod_id)
 
+    app_config = await _catalog_app_config()
     if not product or not product.is_active:
         await callback.message.edit_text(
             "Sản phẩm này hiện không còn khả dụng. Có thể shop đã ẩn, đổi tên hoặc ngừng bán sản phẩm này.",
@@ -302,6 +352,6 @@ async def refresh_product_detail(callback: types.CallbackQuery):
 
     await callback.message.edit_text(
         _product_detail_text(product, stock),
-        reply_markup=_build_product_detail_keyboard(product, stock),
+        reply_markup=_build_product_detail_keyboard(product, stock, app_config.support_username),
     )
     await callback.answer("Đã làm mới sản phẩm")

@@ -43,7 +43,7 @@
                 <span class="text-sm font-semibold text-slate-300">Doanh thu đã ghi nhận</span>
                 <p class="mt-1 text-xs text-slate-500">Tổng doanh thu từ đơn đã hoàn thành.</p>
             </div>
-            <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-xs font-bold text-emerald-300">Revenue</span>
+            <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-xs font-bold text-emerald-300">Doanh thu</span>
         </div>
         <div class="mt-4 text-3xl font-extrabold tracking-tight text-emerald-400">{{ "{:,.0f}".format(stats.revenue) }}đ</div>
     </div>
@@ -54,7 +54,7 @@
                 <span class="text-sm font-semibold text-slate-300">Đơn đã hoàn thành</span>
                 <p class="mt-1 text-xs text-slate-500">Đơn đã chốt thành công trong hệ thống.</p>
             </div>
-            <span class="rounded-full border border-slate-700 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-300">Orders</span>
+            <span class="rounded-full border border-slate-700 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-300">Đơn hàng</span>
         </div>
         <div class="mt-4 text-3xl font-extrabold tracking-tight text-slate-100">{{ stats.completed_orders }}</div>
         <p class="mt-1 text-xs text-slate-500">Tổng cộng {{ stats.total_orders }} đơn hàng.</p>
@@ -66,7 +66,7 @@
                 <span class="text-sm font-semibold text-slate-300">Khách hàng đăng ký</span>
                 <p class="mt-1 text-xs text-slate-500">Người dùng có thể tạo đơn qua shop.</p>
             </div>
-            <span class="rounded-full border border-slate-700 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-300">Customers</span>
+            <span class="rounded-full border border-slate-700 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-300">Khách hàng</span>
         </div>
         <div class="mt-4 text-3xl font-extrabold tracking-tight text-slate-100">{{ stats.total_users }}</div>
     </div>
@@ -79,7 +79,7 @@
                     {% if stats.pending_orders > 0 %}Cần kiểm tra thanh toán và cập nhật trạng thái.{% else %}Không có đơn đang chờ thanh toán.{% endif %}
                 </p>
             </div>
-            <span class="rounded-full border px-2 py-1 text-xs font-bold {% if stats.pending_orders > 0 %}border-amber-400/30 bg-amber-400/10 text-amber-200{% else %}border-slate-700 bg-slate-800 text-slate-300{% endif %}">Pending</span>
+            <span class="rounded-full border px-2 py-1 text-xs font-bold {% if stats.pending_orders > 0 %}border-amber-400/30 bg-amber-400/10 text-amber-200{% else %}border-slate-700 bg-slate-800 text-slate-300{% endif %}">Chờ xử lý</span>
         </div>
         <div class="mt-4 text-3xl font-extrabold tracking-tight {% if stats.pending_orders > 0 %}text-amber-300{% else %}text-slate-100{% endif %}">{{ stats.pending_orders }}</div>
         {% if stats.pending_orders > 0 %}
@@ -90,20 +90,38 @@
 
 <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
     <a href="/admin/payments?status=pending" class="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 transition-colors hover:border-amber-400/50">
-        <div class="text-xs uppercase tracking-[0.18em] text-amber-300">Pending deposits</div>
+        <div class="text-xs uppercase tracking-[0.18em] text-amber-300">Yêu cầu nạp chờ xử lý</div>
         <div class="mt-2 text-2xl font-bold text-slate-100">{{ stats.pending_deposits }}</div>
     </a>
     <a href="/admin/payments?status=underpaid" class="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 transition-colors hover:border-red-400/50">
-        <div class="text-xs uppercase tracking-[0.18em] text-red-300">Underpaid</div>
+        <div class="text-xs uppercase tracking-[0.18em] text-red-300">Chuyển khoản thiếu</div>
         <div class="mt-2 text-2xl font-bold text-slate-100">{{ stats.underpaid_deposits }}</div>
     </a>
     <a href="/admin/payments?status=review_required" class="rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/5 p-4 transition-colors hover:border-fuchsia-400/50">
-        <div class="text-xs uppercase tracking-[0.18em] text-fuchsia-300">Review required</div>
+        <div class="text-xs uppercase tracking-[0.18em] text-fuchsia-300">Cần kiểm tra thủ công</div>
         <div class="mt-2 text-2xl font-bold text-slate-100">{{ stats.review_required }}</div>
     </a>
     <a href="/admin/payments?status=late_paid" class="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 transition-colors hover:border-cyan-400/50">
-        <div class="text-xs uppercase tracking-[0.18em] text-cyan-300">Late paid</div>
+        <div class="text-xs uppercase tracking-[0.18em] text-cyan-300">Tiền về muộn</div>
         <div class="mt-2 text-2xl font-bold text-slate-100">{{ stats.late_paid_deposits }}</div>
+    </a>
+</div>
+
+<div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+    <a href="/admin/support?status=open" class="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 transition-colors hover:border-amber-400/50">
+        <div class="text-xs uppercase tracking-[0.18em] text-amber-300">Ticket đang mở</div>
+        <div class="mt-2 text-2xl font-bold text-slate-100">{{ stats.open_support_tickets }}</div>
+        <div class="mt-1 text-xs text-slate-500">Cần phản hồi hoặc xử lý tiếp</div>
+    </a>
+    <a href="/admin/support?status=admin_replied" class="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-4 transition-colors hover:border-sky-400/50">
+        <div class="text-xs uppercase tracking-[0.18em] text-sky-300">Đã phản hồi chờ khách</div>
+        <div class="mt-2 text-2xl font-bold text-slate-100">{{ stats.admin_replied_tickets }}</div>
+        <div class="mt-1 text-xs text-slate-500">Theo dõi ticket chưa đóng</div>
+    </a>
+    <a href="/admin/users" class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 transition-colors hover:border-emerald-400/50">
+        <div class="text-xs uppercase tracking-[0.18em] text-emerald-300">User mới 7 ngày</div>
+        <div class="mt-2 text-2xl font-bold text-slate-100">{{ stats.new_users_7d }}</div>
+        <div class="mt-1 text-xs text-slate-500">Tín hiệu tăng trưởng khách hàng</div>
     </a>
 </div>
 
@@ -114,10 +132,10 @@
             <h3 class="text-base font-bold text-slate-100">Việc cần xử lý</h3>
             <p class="text-xs text-slate-500 mt-1">Ưu tiên các tác vụ ảnh hưởng trực tiếp đến đơn hàng và tồn kho.</p>
         </div>
-        <span class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Operations queue</span>
+        <span class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Hàng đợi vận hành</span>
     </div>
-    {% if stats.pending_orders > 0 or low_stock_products %}
-    <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+    {% if stats.pending_orders > 0 or low_stock_products or stats.open_support_tickets > 0 %}
+    <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
         {% if stats.pending_orders > 0 %}
         <a href="/admin/orders?status=pending_payment" class="flex items-center justify-between gap-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-4 transition-colors hover:border-amber-400/50">
             <span>
@@ -134,6 +152,15 @@
                 <span class="mt-1 block text-xs text-amber-200/70">Nạp kho trước khi hết hàng hoặc tạm ẩn sản phẩm rủi ro.</span>
             </span>
             <span class="shrink-0 text-xs font-semibold text-amber-200">Nạp kho →</span>
+        </a>
+        {% endif %}
+        {% if stats.open_support_tickets > 0 %}
+        <a href="/admin/support?status=open" class="flex items-center justify-between gap-4 rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-4 transition-colors hover:border-sky-400/50">
+            <span>
+                <span class="block text-sm font-bold text-sky-100">{{ stats.open_support_tickets }} ticket cần theo dõi</span>
+                <span class="mt-1 block text-xs text-sky-200/70">Ưu tiên xử lý các yêu cầu hỗ trợ chưa khép lại.</span>
+            </span>
+            <span class="shrink-0 text-xs font-semibold text-sky-200">Mở hỗ trợ →</span>
         </a>
         {% endif %}
     </div>
@@ -184,13 +211,66 @@
                     {% if order.status.value == 'completed' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
                     {% elif order.status.value == 'pending_payment' %}bg-amber-500/10 text-amber-400 border border-amber-500/20
                     {% else %}bg-slate-700 text-slate-400{% endif %}">
-                    {% if order.status.value == 'completed' %}Xong
-                    {% elif order.status.value == 'pending_payment' %}Chờ duyệt
-                    {% else %}Hủy{% endif %}
+                    {% if order.status.value == 'completed' %}Hoàn thành
+                    {% elif order.status.value == 'pending_payment' %}Chờ thanh toán
+                    {% elif order.status.value == 'paid' %}Đã thanh toán
+                    {% elif order.status.value == 'refunded' %}Đã hoàn tiền
+                    {% else %}Đã hủy{% endif %}
                 </span>
             </div>
             {% else %}
             <div class="text-center py-8 text-slate-500 text-sm">Chưa có đơn hàng nào.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex items-center justify-between gap-3 mb-5">
+            <div>
+                <h3 class="text-base font-bold text-slate-100">Khách hàng nổi bật</h3>
+                <p class="text-xs text-slate-500 mt-1">Top khách theo tổng chi để ưu tiên chăm sóc và xử lý nhanh.</p>
+            </div>
+            <a href="/admin/users" class="text-xs font-semibold text-emerald-400 hover:underline">Mở CRM →</a>
+        </div>
+        <div class="space-y-3">
+            {% for user in top_customers %}
+            <a href="/admin/users/{{ user.id }}" class="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 transition-colors hover:border-slate-700 hover:bg-slate-950">
+                <span class="min-w-0">
+                    <span class="block text-sm font-semibold text-slate-100 truncate">{{ user.full_name or 'Người dùng Telegram' }}</span>
+                    <span class="block text-xs text-slate-500 mt-1">@{{ user.username or 'không có username' }} · ID {{ user.id }}</span>
+                </span>
+                <span class="shrink-0 text-right">
+                    <span class="block text-sm font-bold text-emerald-300">{{ "{:,.0f}".format(user.total_spent|float) }}đ</span>
+                    <span class="mt-1 block text-[11px] text-slate-500">Tổng chi</span>
+                </span>
+            </a>
+            {% else %}
+            <div class="rounded-xl border border-dashed border-slate-700 px-4 py-6 text-sm text-slate-500">Chưa có dữ liệu khách hàng chi tiêu.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex items-center justify-between gap-3 mb-5">
+            <div>
+                <h3 class="text-base font-bold text-slate-100">Hỗ trợ gần đây</h3>
+                <p class="text-xs text-slate-500 mt-1">Nắm nhanh ticket mới cập nhật để không bỏ sót chăm sóc khách hàng.</p>
+            </div>
+            <a href="/admin/support" class="text-xs font-semibold text-emerald-400 hover:underline">Mở ticket →</a>
+        </div>
+        <div class="space-y-3">
+            {% for ticket in recent_support_tickets %}
+            <a href="/admin/support/{{ ticket.id }}" class="block rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3 transition-colors hover:border-slate-700 hover:bg-slate-950">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="font-semibold text-slate-100">Ticket #{{ ticket.id }} · {{ ticket.user.full_name if ticket.user else 'Không rõ user' }}</div>
+                    <div class="text-xs text-slate-500">{{ ticket.updated_at.strftime('%d/%m/%Y %H:%M') if ticket.updated_at else '' }}</div>
+                </div>
+                <div class="mt-1 text-sm text-slate-400">{{ ticket.subject or 'Yêu cầu hỗ trợ từ bot' }}</div>
+            </a>
+            {% else %}
+            <div class="rounded-xl border border-dashed border-slate-700 px-4 py-6 text-sm text-slate-500">Chưa có ticket hỗ trợ nào.</div>
             {% endfor %}
         </div>
     </div>

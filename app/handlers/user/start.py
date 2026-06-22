@@ -10,6 +10,8 @@ from app.config import settings
 from app.database.models import User
 from app.database.session import async_session
 from app.handlers.user.catalog import send_catalog
+from app.services.app_config_service import get_app_config_view
+from app.services import app_config_service, lucky_spin_service, support_service, wallet_service
 from app.handlers.user.orders import send_user_orders
 from app.keyboards.user_kb import (
     BTN_HELP,
@@ -19,7 +21,6 @@ from app.keyboards.user_kb import (
     BTN_SHOW_MENU,
     BTN_SUPPORT,
     BTN_TERMS,
-    DEMO_SPIN_REWARDS,
     get_lucky_spin_kb,
     get_persistent_menu_kb,
     get_show_menu_kb,
@@ -45,9 +46,11 @@ async def ensure_user(message: types.Message) -> bool:
             await session.commit()
 
         if user.is_banned:
+            async with async_session() as config_session:
+                app_config = await get_app_config_view(config_session)
             await message.answer(
                 "🚫 Tài khoản của bạn đã bị cấm sử dụng bot.",
-                reply_markup=get_persistent_menu_kb(),
+                reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
             )
             return False
 
@@ -55,13 +58,19 @@ async def ensure_user(message: types.Message) -> bool:
 
 
 async def send_welcome(message: types.Message) -> None:
+    async with async_session() as session:
+        app_config = await get_app_config_view(session)
+    if app_config.maintenance_mode and message.from_user.id not in settings.ADMIN_IDS:
+        await message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau hoặc liên hệ hỗ trợ nếu bạn cần xử lý gấp.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        return
     await message.answer(
         f"Xin chào {message.from_user.full_name}! 👋\n\n"
-        f"Chào mừng bạn đến với <b>{settings.SHOP_NAME}</b>.\n"
-        "Shop bán sản phẩm số theo mô hình <b>ví điện tử trước, giao hàng tự động sau</b>.\n\n"
-        "Luồng nhanh nhất: <b>Nạp ví → đợi hệ thống cộng tiền → chọn sản phẩm → bot giao hàng tự động ngay trong Telegram</b>.\n\n"
-        "Bấm 🛍 Mua hàng để xem danh mục, hoặc ❓ Hướng dẫn nếu đây là lần đầu bạn mua.",
-        reply_markup=get_persistent_menu_kb(),
+        f"Chào mừng bạn đến với <b>{app_config.shop_display_name}</b>.\n"
+        f"{app_config.welcome_text}",
+        reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
     )
 
 
@@ -69,16 +78,19 @@ async def send_help(message: types.Message) -> None:
     if not await ensure_user(message):
         return
 
+    async with async_session() as session:
+        app_config = await get_app_config_view(session)
+
+    if app_config.maintenance_mode and message.from_user.id not in settings.ADMIN_IDS:
+        await message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau hoặc nhắn hỗ trợ nếu bạn cần xử lý đơn/nạp ví đang dở.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        return
+
     await message.answer(
-        "❓ <b>Hướng dẫn mua hàng</b>\n\n"
-        "1. Vào <b>💰 Ví của tôi</b> và tạo yêu cầu nạp ví.\n"
-        "2. Chuyển khoản <b>đúng số tiền</b> và <b>đúng mã nạp</b> mà bot đã tạo.\n"
-        "3. Hệ thống sẽ tự kiểm tra webhook ngân hàng và cộng số dư ví cho bạn.\n"
-        "4. Sau khi ví đã có tiền, chọn sản phẩm cần mua và xác nhận thanh toán.\n"
-        "5. Bot sẽ tự giao sản phẩm số ngay trong Telegram nếu đơn thành công.\n\n"
-        "Nếu chuyển khoản sai nội dung, webhook chậm, hoặc có lỗi ngoại lệ, hãy bấm 💬 Hỗ trợ. Gửi bill thủ công chỉ là phương án fallback khi cần shop kiểm tra.\n\n"
-        "Bạn có thể gõ <code>/terms</code> để xem điều khoản mua hàng và chính sách hỗ trợ.",
-        reply_markup=get_persistent_menu_kb(),
+        app_config.help_text,
+        reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
     )
 
 
@@ -86,16 +98,21 @@ async def send_terms(message: types.Message) -> None:
     if not await ensure_user(message):
         return
 
+    async with async_session() as session:
+        app_config = await get_app_config_view(session)
+
+    support_username = app_config.support_username
+    keyboard_rows = []
+    if support_username:
+        keyboard_rows.append([types.InlineKeyboardButton(text="Liên hệ hỗ trợ", url=f"https://t.me/{support_username}")])
+
     await message.answer(
-        "📜 <b>Điều khoản mua hàng</b>\n\n"
-        "1. Shop cung cấp <b>sản phẩm số</b>, phần lớn được giao tự động ngay trong Telegram sau khi thanh toán thành công.\n"
-        "2. Người mua phải chuyển khoản <b>đúng số tiền</b> và <b>đúng mã nạp</b> mà bot cung cấp. Chuyển sai nội dung vui lòng liên hệ shop để được hỗ trợ.\n"
-        "3. Sau khi thanh toán thành công, bot sẽ giao đúng nội dung sản phẩm tương ứng ngay trong Telegram.\n"
-        "4. Sau khi sản phẩm số đã giao thành công, shop chỉ hỗ trợ các lỗi hợp lệ như giao thiếu, giao sai, hoặc sự cố hệ thống có thể xác minh.\n"
-        "5. Shop <b>không hoàn tiền tùy ý</b> đối với các trường hợp người dùng đổi ý sau khi đã nhận đúng sản phẩm số, trừ khi admin xác nhận có lỗi từ hệ thống hoặc từ phía shop.\n"
-        "6. Nếu cần hỗ trợ, hãy bấm <b>💬 Hỗ trợ</b> hoặc gõ <code>/support</code> và gửi kèm mã đơn hàng nếu có.\n"
-        "7. Shop có quyền từ chối phục vụ hoặc khóa tài khoản đối với hành vi gian lận, lạm dụng, spam hoặc cố tình gây rối hệ thống.",
-        reply_markup=get_persistent_menu_kb(),
+        app_config.terms_text,
+        reply_markup=(
+            types.InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+            if keyboard_rows
+            else get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button)
+        ),
     )
 
 
@@ -104,18 +121,16 @@ async def send_support(message: types.Message, state: FSMContext) -> None:
         return
 
     await state.set_state(SupportState.waiting_for_message)
-    support_username = (settings.SHOP_SUPPORT_USERNAME or "").strip().lstrip("@")
+    async with async_session() as session:
+        app_config = await get_app_config_view(session)
+    support_username = app_config.support_username
     extra_line = (
         f"Nếu cần, bạn cũng có thể nhắn trực tiếp tại: https://t.me/{support_username}\n\n"
         if support_username else ""
     )
     await message.answer(
-        "💬 <b>Hỗ trợ khách hàng</b>\n\n"
-        "Hãy gửi nội dung bạn cần hỗ trợ ở tin nhắn tiếp theo.\n"
-        "Nếu liên quan đến đơn hàng, vui lòng ghi kèm mã đơn hàng để shop kiểm tra nhanh hơn.\n\n"
-        f"{extra_line}"
-        "Gõ <code>/cancel</code> nếu muốn hủy.",
-        reply_markup=get_persistent_menu_kb(),
+        f"{app_config.support_text}\n\n{extra_line}Gõ <code>/cancel</code> nếu muốn hủy.",
+        reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
     )
 
 
@@ -123,10 +138,18 @@ async def send_lucky_spin(message: types.Message) -> None:
     if not await ensure_user(message):
         return
 
-    rewards_preview = "\n".join(f"• {reward}" for reward in DEMO_SPIN_REWARDS)
+    rewards_preview = "\n".join(f"• {reward}" for reward in lucky_spin_service.reward_preview_labels())
+    async with async_session() as session:
+        latest_spin = await lucky_spin_service.get_latest_spin(session, message.from_user.id)
+
+    cooldown_line = "Bạn đang có <b>1 lượt quay mỗi 24 giờ</b>."
+    if latest_spin and latest_spin.created_at:
+        cooldown_line = f"Lượt quay gần nhất: <b>{latest_spin.created_at.strftime('%H:%M %d/%m/%Y')}</b>. Mỗi user có 1 lượt quay mỗi 24 giờ."
+
     await message.answer(
         "🎡 <b>Vòng quay may mắn</b>\n\n"
-        "Thử vận may của bạn với một vòng quay vui vẻ ngay trong bot.\n"
+        "Retention mini-game đã được mở ở bản cơ bản: quay mỗi ngày để nhận thưởng ví, voucher hoặc quà nhỏ từ shop.\n\n"
+        f"{cooldown_line}\n\n"
         "<b>Một vài phần thưởng có thể quay trúng:</b>\n"
         f"{rewards_preview}\n\n"
         "Bấm nút bên dưới để quay ngay.",
@@ -155,6 +178,11 @@ async def cmd_terms(message: types.Message):
 
 @router.message(Command("vongquaymayman"))
 async def cmd_lucky_spin(message: types.Message):
+    async with async_session() as session:
+        app_config = await get_app_config_view(session)
+    if not app_config.enable_lucky_spin:
+        await message.answer("Tính năng vòng quay may mắn đang tạm ẩn.", reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button))
+        return
     await send_lucky_spin(message)
 
 
@@ -181,13 +209,23 @@ async def cmd_hide_menu(message: types.Message):
 async def cmd_show_menu(message: types.Message):
     if not await ensure_user(message):
         return
-    await message.answer("Đã hiện lại menu phím bấm bên dưới.", reply_markup=get_persistent_menu_kb())
+    async with async_session() as session:
+        app_config = await get_app_config_view(session)
+    await message.answer(
+        "Đã hiện lại menu phím bấm bên dưới.",
+        reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+    )
 
 
 @router.message(Command("cancel"), SupportState.waiting_for_message)
 async def cancel_support(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("Đã hủy gửi yêu cầu hỗ trợ.", reply_markup=get_persistent_menu_kb())
+    async with async_session() as session:
+        app_config = await get_app_config_view(session)
+    await message.answer(
+        "Đã hủy gửi yêu cầu hỗ trợ.",
+        reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+    )
 
 
 @router.message(SupportState.waiting_for_message)
@@ -209,6 +247,37 @@ async def process_support_message(message: types.Message, state: FSMContext):
         f"Trả lời nhanh: <code>/reply {user_id} nội_dung</code>"
     )
 
+    async with async_session() as session:
+        app_config = await get_app_config_view(session)
+
+    if not app_config.enable_support_forwarding:
+        await state.clear()
+        await message.answer(
+            "Tính năng hỗ trợ tạm thời đang được bảo trì. Vui lòng thử lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        return
+
+    async with async_session() as session:
+        ticket_result = await support_service.create_or_append_user_ticket(
+            session,
+            user_id=user_id,
+            content=message.text or '',
+            telegram_message_id=message.message_id,
+        )
+
+    support_text = (
+        "🆘 <b>Yêu cầu hỗ trợ mới</b>\n\n"
+        f"🎫 Ticket: <code>#{ticket_result.ticket.id}</code>\n"
+        f"👤 Tên: <b>{html_decoration.quote(full_name)}</b>\n"
+        f"🆔 User ID: <code>{user_id}</code>\n"
+        f"🔗 Username: <code>@{html_decoration.quote(username)}</code>\n\n"
+        "📝 Nội dung:\n"
+        f"{html_decoration.quote(message.text or '')}\n\n"
+        f"Trả lời nhanh: <code>/reply {user_id} nội_dung</code>\n"
+        f"Mở ticket: <code>/admin/support/{ticket_result.ticket.id}</code>"
+    )
+
     sent = 0
     for admin_id in settings.ADMIN_IDS:
         try:
@@ -220,15 +289,14 @@ async def process_support_message(message: types.Message, state: FSMContext):
     await state.clear()
     if sent == 0:
         await message.answer(
-            "Hiện shop chưa nhận được yêu cầu hỗ trợ tự động. Vui lòng thử lại sau hoặc liên hệ admin trực tiếp.",
-            reply_markup=get_persistent_menu_kb(),
+            "Hiện shop chưa nhận được yêu cầu hỗ trợ tự động. Vui lòng thử lại sau hoặc liên hệ shop trực tiếp.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
         )
         return
 
     await message.answer(
-        "✅ Shop đã nhận được yêu cầu hỗ trợ của bạn.\n"
-        "Admin sẽ phản hồi sớm nhất có thể ngay trong bot này.",
-        reply_markup=get_persistent_menu_kb(),
+        f"✅ Shop đã nhận được yêu cầu hỗ trợ của bạn.\nMã ticket: <code>#{ticket_result.ticket.id}</code>\nAdmin sẽ phản hồi sớm nhất có thể ngay trong bot này.",
+        reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
     )
 
 
@@ -248,8 +316,8 @@ async def cmd_orders(message: types.Message):
     await send_user_orders(message)
 
 
-@router.callback_query(F.data == "lucky_spin_demo")
-async def lucky_spin_demo(callback: types.CallbackQuery):
+@router.callback_query(F.data == "lucky_spin_play")
+async def lucky_spin_play(callback: types.CallbackQuery):
     if not callback.message:
         await callback.answer("Không thể thực hiện vòng quay lúc này.", show_alert=True)
         return
@@ -257,11 +325,33 @@ async def lucky_spin_demo(callback: types.CallbackQuery):
         await callback.answer()
         return
 
-    reward = random.choice(DEMO_SPIN_REWARDS)
+    async with async_session() as session:
+        outcome = await lucky_spin_service.spin_once(session, callback.from_user.id)
+
+    if not outcome.ok:
+        if outcome.next_available_at:
+            await callback.answer(
+                f"Bạn đã dùng lượt quay rồi. Quay lại sau {outcome.next_available_at.strftime('%H:%M %d/%m')}",
+                show_alert=True,
+            )
+        else:
+            await callback.answer(outcome.message, show_alert=True)
+        return
+
+    reward_lines = [
+        "🎉 <b>Kết quả vòng quay may mắn</b>",
+        "",
+        f"Bạn quay trúng: <b>{html_decoration.quote(outcome.reward_label)}</b>",
+    ]
+    if outcome.wallet_amount > 0:
+        reward_lines.append(f"Ví của bạn đã được cộng thêm: <b>{wallet_service.format_vnd(outcome.wallet_amount)}</b>")
+    if outcome.voucher_code:
+        reward_lines.append(f"Mã voucher của bạn: <code>{html_decoration.quote(outcome.voucher_code)}</code>")
+        reward_lines.append("Voucher này có thể dùng ở bước checkout nếu còn hiệu lực.")
+    reward_lines.extend([
+        "",
+        "Bạn sẽ có lượt quay tiếp theo sau 24 giờ.",
+    ])
+
     await callback.answer("Vòng quay đã dừng!", show_alert=False)
-    await callback.message.answer(
-        "🎉 <b>Kết quả vòng quay may mắn</b>\n\n"
-        f"Bạn quay trúng: <b>{html_decoration.quote(reward)}</b>\n\n"
-        "Không có thưởng thật đâu. Lêu lêu.",
-        reply_markup=get_lucky_spin_kb(),
-    )
+    await callback.message.answer("\n".join(reward_lines), reply_markup=get_lucky_spin_kb())
