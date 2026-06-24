@@ -17,6 +17,27 @@ async def _checkout_app_config():
         return await app_config_service.get_app_config_view(session)
 
 
+async def _checkout_maintenance_block_message(message: types.Message, app_config) -> bool:
+    if app_config.maintenance_mode and message.from_user.id not in settings.ADMIN_IDS:
+        await message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        return True
+    return False
+
+
+async def _checkout_maintenance_block_callback(callback: types.CallbackQuery, app_config) -> bool:
+    if app_config.maintenance_mode and callback.from_user.id not in settings.ADMIN_IDS:
+        await callback.message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        await callback.answer()
+        return True
+    return False
+
+
 class QuantityInputState(StatesGroup):
     waiting_for_quantity = State()
 
@@ -131,10 +152,10 @@ async def _render_confirmation(callback: types.CallbackQuery, product_id: int, r
         payment_policy = payment_policy_service.get_policy_view(product)
 
     if product.delivery_mode == "fixed_content":
-        quantity_note = "Sản phẩm này giao nội dung cố định nên mỗi lần mua chỉ nhận 1 nội dung."
-        delivery_note = "Sau khi thanh toán, bot sẽ gửi ngay nội dung/link của sản phẩm trong một tin nhắn riêng."
+        quantity_note = "Số lượng mua: <b>1</b>"
+        delivery_note = "Sau khi thanh toán, bot sẽ gửi ngay nội dung hoặc link của sản phẩm trong một tin nhắn riêng."
     else:
-        quantity_note = "Sản phẩm này bán cố định 1 đơn vị mỗi lần mua." if not product.allow_quantity_selection else (
+        quantity_note = "Số lượng mua: <b>1</b>" if not product.allow_quantity_selection else (
             f"Bạn có thể chọn từ <b>{int(product.min_quantity or 1)}</b> đến <b>{min(stock, max(int(product.max_quantity or 1), int(product.min_quantity or 1)))}</b> đơn vị, hoặc bấm nút nhập số lượng để gõ trực tiếp."
         )
         delivery_note = "Sau khi thanh toán, bot sẽ giao đúng số lượng bạn đã chọn."
@@ -185,6 +206,9 @@ async def confirm_purchase(callback: types.CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("qty_"))
 async def update_purchase_quantity(callback: types.CallbackQuery):
+    app_config = await _checkout_app_config()
+    if await _checkout_maintenance_block_callback(callback, app_config):
+        return
     _, product_id, quantity = callback.data.split("_")
     await _render_confirmation(callback, int(product_id), int(quantity))
     await callback.answer()
@@ -192,6 +216,9 @@ async def update_purchase_quantity(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("voucherinput_"))
 async def request_voucher_input(callback: types.CallbackQuery, state: FSMContext):
+    app_config = await _checkout_app_config()
+    if await _checkout_maintenance_block_callback(callback, app_config):
+        return
     _, product_id, quantity = callback.data.split("_")
     await state.set_state(VoucherInputState.waiting_for_code)
     await state.update_data(product_id=int(product_id), quantity=int(quantity))
@@ -206,6 +233,10 @@ async def request_voucher_input(callback: types.CallbackQuery, state: FSMContext
 
 @router.message(VoucherInputState.waiting_for_code)
 async def handle_voucher_input(message: types.Message, state: FSMContext):
+    app_config = await _checkout_app_config()
+    if await _checkout_maintenance_block_message(message, app_config):
+        await state.clear()
+        return
     code = (message.text or "").strip()
     data = await state.get_data()
     product_id = data.get("product_id")
@@ -309,8 +340,11 @@ async def request_quantity_input(callback: types.CallbackQuery, state: FSMContex
 
 @router.message(QuantityInputState.waiting_for_quantity)
 async def handle_quantity_input(message: types.Message, state: FSMContext):
-    raw_text = (message.text or "").strip()
     app_config = await _checkout_app_config()
+    if await _checkout_maintenance_block_message(message, app_config):
+        await state.clear()
+        return
+    raw_text = (message.text or "").strip()
     if not raw_text.isdigit():
         await message.answer(
             "Vui lòng nhập một số nguyên hợp lệ. Ví dụ: <code>2</code>.",

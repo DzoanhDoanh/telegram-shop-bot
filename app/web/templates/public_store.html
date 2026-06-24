@@ -10,44 +10,47 @@
 <body class="min-h-full bg-slate-950 text-slate-100">
     <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <header class="mb-8 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/30">
-            <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div class="flex flex-col gap-5">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-400">{{ app_config.shop_display_name }}</p>
                     <h1 class="mt-3 text-3xl font-extrabold text-slate-100">Sản phẩm đang bán</h1>
                     <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-400">Public storefront cơ bản dùng chung dữ liệu với bot. Khách có thể xem danh mục, tìm sản phẩm và đọc chính sách trước khi mua trong Telegram.</p>
                     {% if current_category %}
-                    <p class="mt-3 inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">Đang xem danh mục: {{ current_category.emoji or '📦' }} {{ current_category.name }}</p>
+                    <p class="mt-3 inline-flex max-w-full rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">Đang xem danh mục: {{ current_category.emoji or '📦' }} {{ current_category.name }}</p>
                     {% endif %}
                 </div>
-                <nav class="flex flex-wrap gap-3">
+                <nav class="flex flex-wrap gap-2 border-t border-slate-800 pt-4 sm:gap-3">
                     {% for item in nav_links %}
-                    <a href="{{ item.href }}" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800">{{ item.label }}</a>
+                    <a href="{{ item.href }}" class="rounded-xl border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800 sm:px-4">{{ item.label }}</a>
                     {% endfor %}
                 </nav>
             </div>
         </header>
 
         <form method="GET" action="/store" class="mb-6 rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-            <div class="flex flex-col gap-3 xl:flex-row xl:items-center">
+            <div class="flex flex-col gap-3 2xl:flex-row 2xl:items-center">
                 <input type="text" name="q" value="{{ current_query or '' }}" placeholder="Tìm theo tên hoặc mô tả sản phẩm" class="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none">
-                <select name="category_id" class="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none xl:min-w-[220px]">
+                <select name="category_id" class="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none 2xl:min-w-[220px]">
                     <option value="">Tất cả danh mục</option>
                     {% for category in categories %}
                     <option value="{{ category.id }}" {% if selected_category_id == category.id %}selected{% endif %}>{{ category.emoji or '📦' }} {{ category.name }}</option>
                     {% endfor %}
                 </select>
-                <select name="availability" class="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none xl:min-w-[180px]">
+                <select name="availability" class="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none 2xl:min-w-[180px]">
                     <option value="" {% if not current_availability %}selected{% endif %}>Mọi trạng thái</option>
                     <option value="in_stock" {% if current_availability == 'in_stock' %}selected{% endif %}>Chỉ hiện còn hàng</option>
                 </select>
-                <select name="sort" class="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none xl:min-w-[200px]">
+                <select name="sort" class="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none 2xl:min-w-[200px]">
                     <option value="newest" {% if current_sort == 'newest' %}selected{% endif %}>Mới cập nhật</option>
                     <option value="best_value" {% if current_sort == 'best_value' %}selected{% endif %}>Ưu tiên dễ mua</option>
                     <option value="price_asc" {% if current_sort == 'price_asc' %}selected{% endif %}>Giá thấp đến cao</option>
                     <option value="price_desc" {% if current_sort == 'price_desc' %}selected{% endif %}>Giá cao đến thấp</option>
                     <option value="name_asc" {% if current_sort == 'name_asc' %}selected{% endif %}>Tên A-Z</option>
                 </select>
-                <button type="submit" class="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-900 transition hover:bg-emerald-600">Lọc sản phẩm</button>
+                <button type="submit" class="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-slate-900 transition hover:bg-emerald-600 sm:self-auto" aria-label="Lọc sản phẩm">
+                    <span aria-hidden="true">🔎</span>
+                    <span class="hidden sm:inline">Lọc</span>
+                </button>
             </div>
             <div class="mt-3 text-xs text-slate-500">Hiển thị tối đa <b>{{ per_page }}</b> sản phẩm / trang, tổng <b>{{ total_count }}</b> sản phẩm công khai.</div>
         </form>

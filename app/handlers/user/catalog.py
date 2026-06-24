@@ -40,10 +40,17 @@ def _support_url(support_username: str = "") -> str | None:
 async def _ensure_callback_user_allowed(callback: types.CallbackQuery) -> bool:
     async with async_session() as session:
         user = await session.get(User, callback.from_user.id)
+        app_config = await app_config_service.get_app_config_view(session)
         if user and user.is_banned:
-            app_config = await app_config_service.get_app_config_view(session)
             await callback.message.answer(
                 "🚫 Tài khoản của bạn đã bị cấm sử dụng bot.",
+                reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+            )
+            await callback.answer()
+            return False
+        if app_config.maintenance_mode and callback.from_user.id not in settings.ADMIN_IDS:
+            await callback.message.answer(
+                f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
                 reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
             )
             await callback.answer()
@@ -91,16 +98,16 @@ def _product_detail_text(product, stock: int) -> str:
     )
 
     if is_fixed_content:
-        quantity_note = "Mỗi lần mua nhận 1 nội dung cố định, không cần chọn số lượng"
-        delivery_note = "📩 Sau khi thanh toán, bot sẽ gửi ngay nội dung/link đã cấu hình cho sản phẩm này"
+        quantity_note = "1"
+        delivery_note = "📩 Sau khi thanh toán, bot sẽ gửi ngay thông tin sản phẩm cho bạn"
     elif getattr(product, "allow_quantity_selection", False):
         min_quantity = int(product.min_quantity or 1)
         max_quantity = min(stock, max(int(product.max_quantity or 1), min_quantity))
         quantity_note = f"Được chọn từ {min_quantity} đến {max_quantity}"
         delivery_note = "📩 Sau khi thanh toán, bot sẽ giao đúng số lượng bạn đã chọn"
     else:
-        quantity_note = "Sản phẩm này chỉ bán cố định 1 đơn vị mỗi lần mua"
-        delivery_note = "📩 Sau khi thanh toán, bot sẽ giao tự động 1 đơn vị sản phẩm"
+        quantity_note = "1"
+        delivery_note = "📩 Sau khi thanh toán, bot sẽ giao thông tin sản phẩm cho bạn"
 
     text = f"📦 <b>{safe_name}</b>\n\n"
     if safe_description:
@@ -154,8 +161,14 @@ def _build_search_results_keyboard(products, stock_counts: dict[int, int] | None
 
 
 async def _send_search_prompt(message: types.Message, state: FSMContext) -> None:
-    await state.set_state(SearchState.waiting_for_query)
     app_config = await _catalog_app_config()
+    if app_config.maintenance_mode and message.from_user.id not in settings.ADMIN_IDS:
+        await message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        return
+    await state.set_state(SearchState.waiting_for_query)
     await message.answer(
         "🔎 <b>Tìm kiếm sản phẩm</b>\n\n"
         "Nhập tên hoặc từ khóa sản phẩm bạn muốn tìm.\n"
@@ -212,6 +225,14 @@ async def product_search(callback: types.CallbackQuery, state: FSMContext):
 
 @router.message(SearchState.waiting_for_query)
 async def process_product_search(message: types.Message, state: FSMContext):
+    app_config = await _catalog_app_config()
+    if app_config.maintenance_mode and message.from_user.id not in settings.ADMIN_IDS:
+        await state.clear()
+        await message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        return
     query = (message.text or "").strip()
     if len(query) < 2:
         await message.answer("Vui lòng nhập ít nhất 2 ký tự để tìm kiếm.")

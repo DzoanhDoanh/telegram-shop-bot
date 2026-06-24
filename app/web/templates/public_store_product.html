@@ -9,11 +9,13 @@
 </head>
 <body class="min-h-full bg-slate-950 text-slate-100">
     <main class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <a href="/store" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800">← Quay lại storefront</a>
-            <div class="flex flex-wrap gap-3">
+        <div class="mb-6 rounded-3xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5">
+            <div class="flex flex-wrap items-center gap-3">
+                <a href="/store" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800">← Quay lại storefront</a>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2 border-t border-slate-800 pt-4 sm:gap-3">
                 {% for item in nav_links %}
-                <a href="{{ item.href }}" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800">{{ item.label }}</a>
+                <a href="{{ item.href }}" class="rounded-xl border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800 sm:px-4">{{ item.label }}</a>
                 {% endfor %}
             </div>
         </div>

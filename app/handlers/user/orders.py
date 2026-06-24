@@ -29,6 +29,27 @@ async def _orders_app_config():
         return await app_config_service.get_app_config_view(session)
 
 
+async def _orders_maintenance_block_message(message: types.Message, app_config) -> bool:
+    if app_config.maintenance_mode and message.from_user.id not in settings.ADMIN_IDS:
+        await message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        return True
+    return False
+
+
+async def _orders_maintenance_block_callback(callback: types.CallbackQuery, app_config) -> bool:
+    if app_config.maintenance_mode and callback.from_user.id not in settings.ADMIN_IDS:
+        await callback.message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        await callback.answer()
+        return True
+    return False
+
+
 async def _ensure_user_allowed(message: types.Message) -> bool:
     async with async_session() as session:
         user = await session.get(User, message.from_user.id)
@@ -89,8 +110,10 @@ async def send_user_orders(message: types.Message) -> None:
     if not await _ensure_user_allowed(message):
         return
 
-    orders = await _get_recent_orders(message.from_user.id)
     app_config = await _orders_app_config()
+    if await _orders_maintenance_block_message(message, app_config):
+        return
+    orders = await _get_recent_orders(message.from_user.id)
     if not orders:
         await message.answer(
             "📦 Bạn chưa có đơn hàng nào. Bấm 🛍 Mua hàng để chọn sản phẩm đầu tiên.",
@@ -122,8 +145,10 @@ async def show_orders(callback: types.CallbackQuery):
             await callback.answer()
             return
 
-    orders = await _get_recent_orders(callback.from_user.id)
     app_config = await _orders_app_config()
+    if await _orders_maintenance_block_callback(callback, app_config):
+        return
+    orders = await _get_recent_orders(callback.from_user.id)
     if not orders:
         await callback.message.answer(
             "Bạn chưa có đơn hàng nào. Hãy chọn sản phẩm để bắt đầu mua sắm.",
@@ -164,6 +189,9 @@ def _order_support_message(order: Order, support_username: str = "") -> str:
 
 @router.callback_query(F.data == "order_support_latest")
 async def order_support_latest(callback: types.CallbackQuery):
+    app_config = await _orders_app_config()
+    if await _orders_maintenance_block_callback(callback, app_config):
+        return
     orders = await _get_recent_orders(callback.from_user.id)
     latest = orders[0] if orders else None
     if not latest:
@@ -181,6 +209,9 @@ async def order_support_latest(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("order_support_"))
 async def order_support_specific(callback: types.CallbackQuery):
+    app_config = await _orders_app_config()
+    if await _orders_maintenance_block_callback(callback, app_config):
+        return
     order_id = int(callback.data.removeprefix("order_support_"))
     async with async_session() as session:
         order = await session.scalar(

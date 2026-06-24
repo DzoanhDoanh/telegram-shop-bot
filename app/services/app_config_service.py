@@ -35,7 +35,7 @@ DEFAULT_HELP_TEXT = (
     "❓ <b>Hướng dẫn mua hàng</b>\n\n"
     "1. Vào <b>💰 Ví của tôi</b> và tạo yêu cầu nạp ví.\n"
     "2. Chuyển khoản <b>đúng số tiền</b> và <b>đúng mã nạp</b> mà bot đã tạo.\n"
-    "3. Hệ thống sẽ tự kiểm tra webhook ngân hàng và cộng số dư ví cho bạn.\n"
+    "3. Hệ thống sẽ tự kiểm tra giao dịch và cộng số dư ví cho bạn.\n"
     "4. Sau khi ví đã có tiền, chọn sản phẩm cần mua và xác nhận thanh toán.\n"
     "5. Bot sẽ tự giao sản phẩm số ngay trong Telegram nếu đơn thành công.\n\n"
     "Nếu chuyển khoản sai nội dung, webhook chậm, hoặc có sự cố ngoài ý muốn, hãy bấm 💬 Hỗ trợ. Gửi bill thủ công chỉ là phương án dự phòng khi shop cần kiểm tra.\n\n"

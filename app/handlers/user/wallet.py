@@ -110,9 +110,20 @@ async def _wallet_app_config():
 async def _wallet_maintenance_block(message: types.Message, app_config) -> bool:
     if app_config.maintenance_mode and message.from_user.id not in settings.ADMIN_IDS:
         await message.answer(
-            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau hoặc nhắn hỗ trợ nếu bạn cần xử lý giao dịch đang dở.",
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
             reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
         )
+        return True
+    return False
+
+
+async def _wallet_maintenance_block_callback(callback: types.CallbackQuery, app_config) -> bool:
+    if app_config.maintenance_mode and callback.from_user.id not in settings.ADMIN_IDS:
+        await callback.message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        await callback.answer()
         return True
     return False
 
@@ -167,6 +178,9 @@ def _wallet_history_text(transactions: list[wallet_service.WalletTransaction]) -
 
 @router.callback_query(F.data == "wallet_home")
 async def wallet_home(callback: types.CallbackQuery):
+    app_config = await _wallet_app_config()
+    if await _wallet_maintenance_block_callback(callback, app_config):
+        return
     async with async_session() as session:
         user = await session.get(User, callback.from_user.id)
         if not user:
@@ -181,7 +195,6 @@ async def wallet_home(callback: types.CallbackQuery):
         if user.is_banned:
             await callback.answer("Tài khoản của bạn đã bị cấm sử dụng bot.", show_alert=True)
             return
-    app_config = await _wallet_app_config()
     await callback.message.edit_text(
         await _wallet_summary_text(user),
         reply_markup=_wallet_keyboard(app_config.support_username),
@@ -191,6 +204,9 @@ async def wallet_home(callback: types.CallbackQuery):
 
 @router.callback_query(F.data == "wallet_history")
 async def wallet_history(callback: types.CallbackQuery):
+    app_config = await _wallet_app_config()
+    if await _wallet_maintenance_block_callback(callback, app_config):
+        return
     transactions = await _recent_wallet_transactions(callback.from_user.id)
     await callback.message.edit_text(
         _wallet_history_text(transactions),
@@ -229,6 +245,8 @@ def _support_text_for_deposit(tx: wallet_service.WalletTransaction | None, suppo
 @router.callback_query(F.data == "wallet_support")
 async def wallet_support(callback: types.CallbackQuery):
     app_config = await _wallet_app_config()
+    if await _wallet_maintenance_block_callback(callback, app_config):
+        return
     await callback.message.answer(
         _support_text_for_deposit(None, app_config.support_username),
         reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
@@ -238,6 +256,9 @@ async def wallet_support(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("wallet_support_tx_"))
 async def wallet_support_tx(callback: types.CallbackQuery):
+    app_config = await _wallet_app_config()
+    if await _wallet_maintenance_block_callback(callback, app_config):
+        return
     tx_id = int(callback.data.removeprefix("wallet_support_tx_"))
     async with async_session() as session:
         tx = await session.get(wallet_service.WalletTransaction, tx_id)
@@ -299,6 +320,8 @@ async def wallet_deposit(callback: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "wallet_deposit_custom")
 async def wallet_deposit_custom(callback: types.CallbackQuery, state: FSMContext):
     app_config = await _wallet_app_config()
+    if await _wallet_maintenance_block_callback(callback, app_config):
+        return
     await state.set_state(WalletState.waiting_for_deposit_amount)
     async with async_session() as session:
         payment_config = await wallet_service.get_active_payment_config(session)
@@ -312,6 +335,8 @@ async def wallet_deposit_custom(callback: types.CallbackQuery, state: FSMContext
 @router.callback_query(F.data.startswith("wallet_deposit_amount_"))
 async def wallet_deposit_preset(callback: types.CallbackQuery, state: FSMContext):
     app_config = await _wallet_app_config()
+    if await _wallet_maintenance_block_callback(callback, app_config):
+        return
     raw_amount = callback.data.removeprefix("wallet_deposit_amount_")
     try:
         amount = Decimal(raw_amount)
@@ -325,6 +350,9 @@ async def wallet_deposit_preset(callback: types.CallbackQuery, state: FSMContext
 
 @router.callback_query(F.data.startswith("wallet_cancel_deposit_"))
 async def wallet_cancel_deposit(callback: types.CallbackQuery):
+    app_config = await _wallet_app_config()
+    if await _wallet_maintenance_block_callback(callback, app_config):
+        return
     tx_id = int(callback.data.removeprefix("wallet_cancel_deposit_"))
 
     async with async_session() as session:
@@ -453,6 +481,9 @@ async def _create_deposit_request_from_amount(message: types.Message, from_user:
 @router.message(WalletState.waiting_for_deposit_amount)
 async def process_deposit_amount(message: types.Message, state: FSMContext):
     app_config = await _wallet_app_config()
+    if await _wallet_maintenance_block(message, app_config):
+        await state.clear()
+        return
     raw_amount = (message.text or "").replace(".", "").replace(",", "").strip()
     try:
         amount = Decimal(raw_amount)

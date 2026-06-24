@@ -120,9 +120,15 @@ async def send_support(message: types.Message, state: FSMContext) -> None:
     if not await ensure_user(message):
         return
 
-    await state.set_state(SupportState.waiting_for_message)
     async with async_session() as session:
         app_config = await get_app_config_view(session)
+    if app_config.maintenance_mode and message.from_user.id not in settings.ADMIN_IDS:
+        await message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        return
+    await state.set_state(SupportState.waiting_for_message)
     support_username = app_config.support_username
     extra_line = (
         f"Nếu cần, bạn cũng có thể nhắn trực tiếp tại: https://t.me/{support_username}\n\n"
@@ -138,9 +144,16 @@ async def send_lucky_spin(message: types.Message) -> None:
     if not await ensure_user(message):
         return
 
-    rewards_preview = "\n".join(f"• {reward}" for reward in lucky_spin_service.reward_preview_labels())
     async with async_session() as session:
+        app_config = await get_app_config_view(session)
         latest_spin = await lucky_spin_service.get_latest_spin(session, message.from_user.id)
+    if app_config.maintenance_mode and message.from_user.id not in settings.ADMIN_IDS:
+        await message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        return
+    rewards_preview = "\n".join(f"• {reward}" for reward in lucky_spin_service.reward_preview_labels())
 
     cooldown_line = "Bạn đang có <b>1 lượt quay mỗi 24 giờ</b>."
     if latest_spin and latest_spin.created_at:
@@ -234,6 +247,16 @@ async def process_support_message(message: types.Message, state: FSMContext):
         await state.clear()
         return
 
+    async with async_session() as session:
+        app_config = await get_app_config_view(session)
+    if app_config.maintenance_mode and message.from_user.id not in settings.ADMIN_IDS:
+        await state.clear()
+        await message.answer(
+            f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+            reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+        )
+        return
+
     user_id = message.from_user.id
     username = message.from_user.username or "không có"
     full_name = message.from_user.full_name or "Không rõ tên"
@@ -246,9 +269,6 @@ async def process_support_message(message: types.Message, state: FSMContext):
         f"{html_decoration.quote(message.text or '')}\n\n"
         f"Trả lời nhanh: <code>/reply {user_id} nội_dung</code>"
     )
-
-    async with async_session() as session:
-        app_config = await get_app_config_view(session)
 
     if not app_config.enable_support_forwarding:
         await state.clear()
@@ -326,6 +346,14 @@ async def lucky_spin_play(callback: types.CallbackQuery):
         return
 
     async with async_session() as session:
+        app_config = await get_app_config_view(session)
+        if app_config.maintenance_mode and callback.from_user.id not in settings.ADMIN_IDS:
+            await callback.message.answer(
+                f"{app_config.shop_display_name} đang tạm bảo trì. Vui lòng quay lại sau.",
+                reply_markup=get_persistent_menu_kb(app_config.show_terms_button, app_config.show_help_button),
+            )
+            await callback.answer()
+            return
         outcome = await lucky_spin_service.spin_once(session, callback.from_user.id)
 
     if not outcome.ok:
