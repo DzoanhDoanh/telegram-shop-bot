@@ -4,7 +4,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.config import settings
-from app.database.models import User
+from app.database.models import Order, OrderStatus, User
 from app.database.session import async_session
 from app.keyboards.user_kb import get_persistent_menu_kb
 from app.services import app_config_service, order_service, payment_policy_service, product_service, voucher_service, wallet_service
@@ -61,6 +61,16 @@ def _success_keyboard(order_id: int | None = None) -> InlineKeyboardMarkup:
     ]
     if order_id:
         rows.append([InlineKeyboardButton(text="Hỗ trợ về đơn này", callback_data=f"order_support_{order_id}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _direct_bank_order_keyboard(order_id: int, qr_url: str | None = None) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if qr_url:
+        rows.append([InlineKeyboardButton(text="Mở QR thanh toán", url=qr_url)])
+    rows.append([InlineKeyboardButton(text="Tôi đã chuyển khoản", callback_data=f"direct_bank_manual_paid_{order_id}")])
+    rows.append([InlineKeyboardButton(text="Xem đơn hàng", callback_data="shop_orders")])
+    rows.append([InlineKeyboardButton(text="Mua sản phẩm khác", callback_data="shop_catalog")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -498,11 +508,7 @@ async def _create_direct_bank_order(callback: types.CallbackQuery, context: dict
         f"Nội dung chuyển khoản: <code>{order_code}</code>\n\n"
         "Hệ thống sẽ tự xác nhận và giao hàng ngay sau khi nhận đúng tiền và đúng nội dung chuyển khoản."
     )
-    rows = [[InlineKeyboardButton(text="Xem đơn hàng", callback_data="shop_orders")]]
-    if qr_url:
-        rows.insert(0, [InlineKeyboardButton(text="Mở QR thanh toán", url=qr_url)])
-    rows.append([InlineKeyboardButton(text="Mua sản phẩm khác", callback_data="shop_catalog")])
-    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+    await callback.message.edit_text(text, reply_markup=_direct_bank_order_keyboard(order.id, qr_url))
     if qr_url:
         try:
             await callback.message.answer_photo(
@@ -511,6 +517,57 @@ async def _create_direct_bank_order(callback: types.CallbackQuery, context: dict
             )
         except Exception:
             await callback.message.answer(f"🔗 QR thanh toán: {qr_url}")
+
+
+@router.callback_query(F.data.startswith("direct_bank_manual_paid_"))
+async def direct_bank_manual_paid(callback: types.CallbackQuery):
+    app_config = await _checkout_app_config()
+    if await _checkout_maintenance_block_callback(callback, app_config):
+        return
+    order_id = int(callback.data.removeprefix("direct_bank_manual_paid_"))
+
+    async with async_session() as session:
+        order = await session.get(Order, order_id)
+        if not order or order.user_id != callback.from_user.id:
+            await callback.answer("Không tìm thấy đơn cần xác nhận.", show_alert=True)
+            return
+        if order.payment_method != payment_policy_service.PAYMENT_METHOD_DIRECT_BANK:
+            await callback.answer("Đơn này không phải đơn chuyển khoản trực tiếp.", show_alert=True)
+            return
+        if order.status != OrderStatus.PENDING_PAYMENT:
+            await callback.answer("Đơn này không còn ở trạng thái chờ thanh toán.", show_alert=True)
+            return
+
+        note_line = "Người dùng đã bấm xác nhận chuyển khoản thủ công, chờ admin kiểm tra."
+        order.payment_note = wallet_service.append_manual_review_note(order.payment_note, note_line)
+        await session.commit()
+        await session.refresh(order)
+
+    order_code = wallet_service.get_order_code(order)
+    user_label = callback.from_user.full_name or callback.from_user.username or str(callback.from_user.id)
+    await wallet_service.notify_admins(
+        callback.bot,
+        (
+            "🔔 Người dùng vừa báo đã chuyển khoản cho đơn hàng\n\n"
+            f"Người dùng: {user_label}\n"
+            f"User ID: <code>{callback.from_user.id}</code>\n"
+            f"Mã đơn: <b>{order_code}</b>\n"
+            f"Số tiền: <b>{wallet_service.format_vnd(order.total_amount)}</b>\n"
+            f"Trạng thái hiện tại: <b>{wallet_service.get_order_status_label(order.status)}</b>\n"
+            "Hãy kiểm tra thủ công nếu webhook chưa tự đối soát."
+        ),
+    )
+    await callback.message.answer(
+        "✅ <b>Đã ghi nhận báo cáo chuyển khoản</b>\n\n"
+        f"Mã đơn: <b>{order_code}</b>\n"
+        f"Số tiền: <b>{wallet_service.format_vnd(order.total_amount)}</b>\n\n"
+        "Shop đã nhận được yêu cầu kiểm tra thủ công. Nếu webhook đang lỗi hoặc chậm, admin sẽ đối soát và xử lý đơn sau khi xác nhận giao dịch.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Xem đơn hàng", callback_data="shop_orders")],
+            [InlineKeyboardButton(text="Hỗ trợ về đơn này", callback_data=f"order_support_{order.id}")],
+        ]),
+    )
+    await callback.answer("Đã gửi yêu cầu kiểm tra thủ công")
 
 
 @router.callback_query(F.data.startswith("purchase_"))

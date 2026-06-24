@@ -13,12 +13,12 @@
             <div class="grid gap-8 lg:grid-cols-[1.3fr_0.7fr] lg:items-center">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.26em] text-emerald-400">{{ app_config.shop_display_name }}</p>
-                    <h1 class="mt-4 text-4xl font-black tracking-tight text-slate-50 sm:text-5xl">Storefront công khai cho shop bán hàng qua Telegram.</h1>
-                    <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-300">Khách có thể duyệt danh mục, xem chi tiết sản phẩm và đọc chính sách mua hàng trước khi nhắn Telegram để chốt đơn. Đây là nền public storefront đầu tiên dùng chung dữ liệu với bot hiện tại.</p>
+                    <h1 class="mt-4 text-4xl font-black tracking-tight text-slate-50 sm:text-5xl">Trang bán hàng công khai cho shop qua Telegram.</h1>
+                    <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-300">Khách có thể duyệt danh mục, xem chi tiết sản phẩm và đọc chính sách mua hàng trước khi nhắn Telegram để chốt đơn. Đây là trang bán hàng công khai đầu tiên dùng chung dữ liệu với bot hiện tại.</p>
                     <div class="mt-6 flex flex-wrap gap-3">
                         <a href="/store" class="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-900 hover:bg-emerald-600">Xem toàn bộ sản phẩm</a>
                         {% if support_url %}
-                        <a href="{{ support_url }}" class="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-slate-600 hover:bg-slate-800">Liên hệ Telegram</a>
+                        <a href="{{ support_url }}" class="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-slate-600 hover:bg-slate-800">Liên hệ qua Telegram</a>
                         {% endif %}
                     </div>
                 </div>
@@ -28,7 +28,7 @@
                         <div class="mt-2 text-3xl font-extrabold text-slate-50">{{ categories|length }}</div>
                     </div>
                     <div class="rounded-3xl border border-slate-800 bg-slate-950/50 p-5">
-                        <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Legal pages</div>
+                        <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Trang chính sách</div>
                         <div class="mt-2 text-sm leading-6 text-slate-300">Điều khoản, hỗ trợ & hậu mãi đang dùng chung nội dung cấu hình trong admin.</div>
                     </div>
                 </div>
@@ -62,14 +62,14 @@
 
         <section class="mt-10 grid gap-4 lg:grid-cols-3">
             <div class="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-                <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Trust signal</div>
+                <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Tạo sự yên tâm</div>
                 <div class="mt-2 text-lg font-bold text-slate-100">Điều khoản công khai</div>
                 <p class="mt-2 text-sm leading-6 text-slate-300">Khách có thể kiểm tra điều khoản mua hàng và hậu mãi ngay trên website trước khi vào bot.</p>
             </div>
             <div class="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-                <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Support flow</div>
+                <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Luồng hỗ trợ</div>
                 <div class="mt-2 text-lg font-bold text-slate-100">Hỗ trợ qua Telegram</div>
-                <p class="mt-2 text-sm leading-6 text-slate-300">Storefront public đang đóng vai trò discovery + trust layer, còn xử lý mua và hỗ trợ đi qua kênh Telegram hiện tại.</p>
+                <p class="mt-2 text-sm leading-6 text-slate-300">Trang công khai này đóng vai trò giúp khách khám phá sản phẩm và yên tâm hơn trước khi mua, còn xử lý mua và hỗ trợ vẫn đi qua Telegram.</p>
             </div>
             <div class="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
                 <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Dữ liệu dùng chung</div>
@@ -92,7 +92,7 @@
             <div class="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
                 <div class="text-xs uppercase tracking-[0.18em] text-amber-300">Bước 3</div>
                 <h2 class="mt-2 text-xl font-bold text-slate-50">Nhận hàng và được hỗ trợ sau mua</h2>
-                <p class="mt-3 text-sm leading-6 text-slate-300">Sản phẩm số phù hợp sẽ được giao tự động, còn các vấn đề hậu mãi có thể đối chiếu theo policy công khai.</p>
+                <p class="mt-3 text-sm leading-6 text-slate-300">Sản phẩm số phù hợp sẽ được giao tự động, còn các vấn đề hậu mãi có thể đối chiếu theo chính sách công khai.</p>
             </div>
         </section>
 
@@ -100,7 +100,7 @@
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div>
                     <h2 class="text-2xl font-bold text-slate-100">Sản phẩm mới cập nhật</h2>
-                    <p class="mt-1 text-sm text-slate-400">Lấy trực tiếp từ catalog đang bán trên hệ thống.</p>
+                    <p class="mt-1 text-sm text-slate-400">Lấy trực tiếp từ danh mục sản phẩm đang bán trên hệ thống.</p>
                 </div>
             </div>
             <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -138,8 +138,8 @@
                 <div class="text-xs uppercase tracking-[0.18em] text-slate-500">FAQ nhanh</div>
                 <h2 class="mt-2 text-2xl font-bold text-slate-100">Khách thường hỏi gì trước khi mua?</h2>
                 <div class="mt-5 space-y-4 text-sm leading-6 text-slate-300">
-                    <div><b class="text-slate-100">Mua trên web hay Telegram?</b><br>Web dùng để xem hàng, đọc policy và chọn sản phẩm. Việc chốt đơn/giao hàng hiện đi qua Telegram.</div>
-                    <div><b class="text-slate-100">Có xem điều khoản trước khi mua được không?</b><br>Có. Policy công khai ngay trên web và đồng bộ với cấu hình vận hành hiện tại của shop.</div>
+                    <div><b class="text-slate-100">Mua trên web hay Telegram?</b><br>Web dùng để xem hàng, đọc chính sách và chọn sản phẩm. Việc chốt đơn/giao hàng hiện đi qua Telegram.</div>
+                    <div><b class="text-slate-100">Có xem điều khoản trước khi mua được không?</b><br>Có. Chính sách được công khai ngay trên web và đồng bộ với cấu hình vận hành hiện tại của shop.</div>
                     <div><b class="text-slate-100">Nếu phát sinh lỗi sau mua thì sao?</b><br>Khách có thể đối chiếu trang hỗ trợ & hậu mãi rồi nhắn Telegram để shop xử lý đúng ngữ cảnh đơn hàng.</div>
                 </div>
             </div>
@@ -148,7 +148,7 @@
                 <h2 class="mt-2 text-2xl font-bold text-slate-50">Muốn chốt nhanh?</h2>
                 <p class="mt-3 text-sm leading-6 text-slate-300">Hãy xem sản phẩm phù hợp, kiểm tra điều khoản, sau đó nhắn Telegram để shop xử lý trên cùng một nguồn dữ liệu với bot.</p>
                 <div class="mt-5 flex flex-wrap gap-3">
-                    <a href="/store" class="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-900 hover:bg-emerald-600">Xem catalog</a>
+                    <a href="/store" class="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-900 hover:bg-emerald-600">Xem danh mục</a>
                     <a href="/terms" class="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-slate-600 hover:bg-slate-800">Xem điều khoản</a>
                     {% if support_url %}
                     <a href="{{ support_url }}" class="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-slate-600 hover:bg-slate-800">Nhắn Telegram</a>

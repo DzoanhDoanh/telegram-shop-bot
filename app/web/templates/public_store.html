@@ -14,7 +14,7 @@
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-400">{{ app_config.shop_display_name }}</p>
                     <h1 class="mt-3 text-3xl font-extrabold text-slate-100">Sản phẩm đang bán</h1>
-                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-400">Public storefront cơ bản dùng chung dữ liệu với bot. Khách có thể xem danh mục, tìm sản phẩm và đọc chính sách trước khi mua trong Telegram.</p>
+                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-400">Trang bán hàng công khai này dùng chung dữ liệu với bot. Khách có thể xem danh mục, tìm sản phẩm và đọc chính sách trước khi mua trong Telegram.</p>
                     {% if current_category %}
                     <p class="mt-3 inline-flex max-w-full rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">Đang xem danh mục: {{ current_category.emoji or '📦' }} {{ current_category.name }}</p>
                     {% endif %}
@@ -66,7 +66,7 @@
             </div>
             <div class="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
                 <div class="text-xs uppercase tracking-[0.18em] text-slate-500">Điều khoản</div>
-                <div class="mt-2 text-sm leading-6 text-slate-300">Nội dung public trên web đang dùng chung dữ liệu cấu hình trong admin, giảm lệch thông tin giữa bot và website.</div>
+                <div class="mt-2 text-sm leading-6 text-slate-300">Nội dung công khai trên web đang dùng chung dữ liệu cấu hình trong trang quản trị, giúp giảm lệch thông tin giữa bot và website.</div>
             </div>
         </section>
 
@@ -79,7 +79,7 @@
                         <div class="mt-2 text-sm leading-6 text-slate-400">Lọc theo danh mục, giá và trạng thái để tìm món phù hợp.</div>
                     </div>
                     <div class="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                        <div class="text-sm font-bold text-slate-100">2. Kiểm tra policy</div>
+                        <div class="text-sm font-bold text-slate-100">2. Xem chính sách</div>
                         <div class="mt-2 text-sm leading-6 text-slate-400">Đọc điều khoản và hỗ trợ trước khi nhắn shop để giảm hiểu nhầm.</div>
                     </div>
                     <div class="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
@@ -94,7 +94,7 @@
                 <ul class="mt-4 space-y-3 text-sm leading-6 text-slate-300">
                     <li>• Trang điều khoản và hỗ trợ công khai trước khi mua</li>
                     <li>• Trạng thái còn hàng, giao tự động, chọn số lượng hiển thị rõ trên từng card</li>
-                    <li>• Catalog web dùng chung dữ liệu với bot và admin</li>
+                    <li>• Trang web dùng chung dữ liệu với bot và trang quản trị</li>
                 </ul>
                 <div class="mt-5 flex flex-wrap gap-3">
                     <a href="/terms" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800">Xem điều khoản</a>
@@ -126,23 +126,6 @@
                 <div class="flex flex-1 flex-col p-5">
                     <div class="text-2xl font-extrabold text-slate-50">{{ '{:,.0f}'.format(product.price|float) }}đ</div>
                     <p class="mt-3 line-clamp-3 min-h-[72px] text-sm leading-6 text-slate-300">{{ product.description or 'Shop chưa cập nhật mô tả chi tiết cho sản phẩm này.' }}</p>
-                    <div class="mt-4 grid gap-2 rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-400">
-                        {% if product.is_bundle and product.bundle_items_text %}
-                        <div class="line-clamp-2">Combo gồm: <b class="text-slate-200">{{ product.bundle_items_text }}</b></div>
-                        {% endif %}
-                        {% if product.is_fixed_content %}
-                        <div>Nội dung giao có sẵn, giao tự động sau khi mua.</div>
-                        {% else %}
-                        <div>Tồn kho hiện tại: <b class="text-slate-200">{{ product.stock }}</b></div>
-                        {% endif %}
-                        <div>
-                            {% if product.allow_quantity_selection %}
-                            Cho phép chọn số lượng từ <b class="text-slate-200">{{ product.min_quantity }}</b> đến <b class="text-slate-200">{{ product.max_quantity }}</b>
-                            {% else %}
-                            Mỗi lần mua áp dụng 1 cấu hình số lượng cố định.
-                            {% endif %}
-                        </div>
-                    </div>
                     <div class="mt-auto flex flex-wrap gap-3 pt-5">
                         <a href="/store/products/{{ product.id }}" class="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800">Xem chi tiết</a>
                         {% if support_url %}

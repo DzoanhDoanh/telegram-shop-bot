@@ -42,6 +42,7 @@ def _wallet_keyboard(support_username: str = "") -> InlineKeyboardMarkup:
 
 def _deposit_keyboard(tx_id: int) -> InlineKeyboardMarkup:
     keyboard = []
+    keyboard.append([InlineKeyboardButton(text="Tôi đã chuyển khoản", callback_data=f"wallet_manual_paid_{tx_id}")])
     keyboard.append([InlineKeyboardButton(text="Hủy yêu cầu nạp ví", callback_data=f"wallet_cancel_deposit_{tx_id}")])
     keyboard.append([InlineKeyboardButton(text="Hỗ trợ về mã nạp này", callback_data=f"wallet_support_tx_{tx_id}")])
     keyboard.append([InlineKeyboardButton(text="Xem ví", callback_data="wallet_home")])
@@ -231,7 +232,7 @@ def _support_text_for_deposit(tx: wallet_service.WalletTransaction | None, suppo
     if support_username:
         tail = f"\n\nLiên hệ trực tiếp: https://t.me/{support_username}"
     if not tx:
-        return base + "Shop sẽ kiểm tra giao dịch và xử lý thủ công nếu webhook ngân hàng bị chậm hoặc nội dung chuyển khoản không khớp." + tail
+        return base + "Shop sẽ kiểm tra giao dịch và xử lý thủ công nếu hệ thống bị chậm hoặc nội dung chuyển khoản không khớp." + tail
     return (
         base
         + f"Mã nạp hiện tại: <code>{tx.reference or 'Chưa có mã'}</code>\n"
@@ -346,6 +347,59 @@ async def wallet_deposit_preset(callback: types.CallbackQuery, state: FSMContext
     await state.clear()
     await callback.answer("Đang tạo yêu cầu nạp ví...")
     await _create_deposit_request_from_amount(callback.message, callback.from_user, amount, app_config)
+
+
+@router.callback_query(F.data.startswith("wallet_manual_paid_"))
+async def wallet_manual_paid(callback: types.CallbackQuery):
+    app_config = await _wallet_app_config()
+    if await _wallet_maintenance_block_callback(callback, app_config):
+        return
+    tx_id = int(callback.data.removeprefix("wallet_manual_paid_"))
+
+    async with async_session() as session:
+        tx = await session.get(wallet_service.WalletTransaction, tx_id)
+        if not tx or tx.user_id != callback.from_user.id:
+            await callback.answer("Không tìm thấy yêu cầu nạp ví cần xác nhận.", show_alert=True)
+            return
+        if tx.tx_type != wallet_service.WalletTxType.DEPOSIT:
+            await callback.answer("Đây không phải yêu cầu nạp ví hợp lệ.", show_alert=True)
+            return
+        if tx.status == wallet_service.WalletTxStatus.SUCCESS:
+            await callback.answer("Yêu cầu này đã được cộng ví rồi.", show_alert=True)
+            return
+        if tx.status == wallet_service.WalletTxStatus.CANCELLED:
+            await callback.answer("Yêu cầu nạp ví này đã bị hủy.", show_alert=True)
+            return
+
+        note_line = "Người dùng đã bấm xác nhận chuyển khoản thủ công, chờ admin kiểm tra."
+        tx.note = wallet_service.append_manual_review_note(tx.note, note_line)
+        await session.commit()
+        await session.refresh(tx)
+
+    user_label = callback.from_user.full_name or callback.from_user.username or str(callback.from_user.id)
+    await wallet_service.notify_admins(
+        callback.bot,
+        (
+            "🔔 Người dùng vừa báo đã chuyển khoản nạp ví\n\n"
+            f"Người dùng: {user_label}\n"
+            f"User ID: <code>{callback.from_user.id}</code>\n"
+            f"Mã nạp: <code>{tx.reference or 'Chưa có mã'}</code>\n"
+            f"Số tiền: <b>{wallet_service.format_vnd(tx.amount)}</b>\n"
+            f"Trạng thái hiện tại: <b>{wallet_service.get_wallet_status_label(tx.status)}</b>\n"
+            "Hãy kiểm tra thủ công nếu webhook chưa tự đối soát."
+        ),
+    )
+    await callback.message.answer(
+        "✅ <b>Đã ghi nhận báo cáo chuyển khoản</b>\n\n"
+        f"Mã nạp: <code>{tx.reference or 'Chưa có mã'}</code>\n"
+        f"Số tiền: <b>{wallet_service.format_vnd(tx.amount)}</b>\n\n"
+        "Shop đã nhận được yêu cầu kiểm tra thủ công. Nếu webhook đang lỗi hoặc chậm, admin sẽ đối soát và cộng ví sau khi xác nhận giao dịch.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Hỗ trợ về mã nạp này", callback_data=f"wallet_support_tx_{tx.id}")],
+            [InlineKeyboardButton(text="Xem ví", callback_data="wallet_home")],
+        ]),
+    )
+    await callback.answer("Đã gửi yêu cầu kiểm tra thủ công")
 
 
 @router.callback_query(F.data.startswith("wallet_cancel_deposit_"))

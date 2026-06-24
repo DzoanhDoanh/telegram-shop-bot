@@ -43,6 +43,18 @@ async def notify_admins(bot: Bot | None, text: str) -> None:
             logger.exception("Failed to send admin payment alert", extra={"admin_id": admin_id})
 
 
+def append_manual_review_note(existing_note: str | None, line: str) -> str:
+    clean_line = (line or "").strip()
+    if not clean_line:
+        return (existing_note or "").strip()
+    existing = (existing_note or "").strip()
+    if clean_line in existing:
+        return existing
+    if not existing:
+        return clean_line
+    return f"{existing}\n{clean_line}"
+
+
 @dataclass(slots=True)
 class WalletResult:
     success: bool
