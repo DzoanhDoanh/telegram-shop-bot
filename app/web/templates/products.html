@@ -16,7 +16,7 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
         Danh mục hàng bán qua bot
       </h2>
       <p class="max-w-3xl text-sm leading-6 text-slate-400">
-        Mỗi sản phẩm được bán trực tiếp qua bot. Hãy giữ giá, danh mục và tồn kho rõ ràng để khách nhìn đúng thông tin và hệ thống vận hành ổn định.
+        Mỗi sản phẩm được bán trực tiếp qua bot. Với sản phẩm giao theo link/nội dung có sẵn, hãy cập nhật nội dung giao thay vì nạp kho để tránh nhầm với hàng dạng key hoặc tài khoản.
       </p>
       <p class="text-sm text-slate-500">
         Hiện có
@@ -126,7 +126,7 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
           <th
             class="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-500"
           >
-            Tồn kho
+            Kiểu giao / khả dụng
           </th>
           <th
             class="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-500"
@@ -143,6 +143,7 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
             <div class="flex flex-wrap items-center gap-2">
               <div class="font-semibold text-slate-100">{{ p.name }}</div>
               {% if p.is_bundle %}<span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">Combo</span>{% endif %}
+              {% if p.delivery_mode == 'fixed_content' %}<span class="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-[11px] font-semibold text-sky-300">Nội dung có sẵn</span>{% else %}<span class="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-300">Theo kho</span>{% endif %}
             </div>
             {% if p.description %}
             <div class="mt-0.5 max-w-xs truncate text-xs text-slate-500">
@@ -158,20 +159,38 @@ block page_title %}Quản lý sản phẩm{% endblock %} {% block content %}
             {{ "{:,.0f}".format(p.price) }}đ
           </td>
           <td class="px-4 py-4 text-center">
-            <span
-              class="font-bold {% if p.stock == 0 %}text-red-400{% elif p.stock < 5 %}text-amber-400{% else %}text-slate-100{% endif %}"
-            >
-              {{ p.stock }}
-            </span>
+            {% if p.delivery_mode == 'fixed_content' %}
+            <div class="space-y-1">
+              <div class="font-bold text-sky-300">Hàng có sẵn</div>
+
+            </div>
+            {% else %}
+            <div class="space-y-1">
+              <span
+                class="font-bold {% if p.stock == 0 %}text-red-400{% elif p.stock < 5 %}text-amber-400{% else %}text-slate-100{% endif %}"
+              >
+                {{ p.stock }} số lượng tồn kho
+              </span>
+              <div class="text-xs text-slate-500">
+                {% if p.allow_quantity_selection %}
+                Cho chọn số lượng: {{ p.min_quantity or 1 }}–{{ p.max_quantity or 1 }}
+                {% else %}
+                Mỗi đơn mua số lượng nhất định
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
           </td>
           <td class="px-4 py-4">
             <div class="flex flex-wrap items-center justify-center gap-2">
+              {% if p.delivery_mode != 'fixed_content' %}
               <a
                 href="/admin/inventory?product_id={{ p.id }}"
                 class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20"
               >
                 Nạp kho
               </a>
+              {% endif %}
               <button
                 type="button"
                 onclick="document.getElementById('editModal{{ p.id }}').classList.remove('hidden')"
